@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/gruesomeparty/severance/schemas/config.schema.json",
+  "title": "Severance user config",
+  "description": "~/.claude/severance/config.json — the priority ladder and resume stagger. Projects declare how much they matter; the ladder decides when they trip, analogous to under-frequency load shedding (PRD §5.4).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ladder"],
+  "properties": {
+    "ladder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["critical", "high", "normal", "low"],
+      "properties": {
+        "critical": { "$ref": "#/$defs/band" },
+        "high": { "$ref": "#/$defs/band" },
+        "normal": { "$ref": "#/$defs/band" },
+        "low": { "$ref": "#/$defs/band" }
+      }
+    },
+    "resume_stagger_minutes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Minutes between priority bands during priority-ordered resume (default 15)."
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Optional user-level default values for SEVERANCE_* variables (resolution order §5.4: project env > this > built-in defaults)."
+    }
+  },
+  "$defs": {
+    "band": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["session", "weekly", "reserve"],
+      "description": "One priority band's thresholds. null disables that gate for the band.",
+      "properties": {
+        "session": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Session (5h) utilization trip threshold; null = session gate off."
+        },
+        "weekly": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Weekly (7d) utilization trip threshold; null = weekly gate off."
+        },
+        "reserve": {
+          "type": ["number", "null"],
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Preemption headroom threshold (§5.6); null = this band never preempts lower ones."
+        }
+      }
+    }
+  }
+}
