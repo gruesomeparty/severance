@@ -1,0 +1,15 @@
+{
+  "blocks": [
+    {
+      "id": "2026-07-03T10:00:00.000Z",
+      "isActive": true,
+      "isGap": false,
+      "startTime": "2026-07-03T10:00:00.000Z",
+      "endTime": "2026-07-03T15:00:00.000Z",
+      "costUSD": 2.75,
+      "totalTokens": 123456,
+      "tokenCounts": { "inputTokens": 100000, "outputTokens": 23456, "cacheCreationInputTokens": 0, "cacheReadInputTokens": 0 },
+      "models": ["claude-sonnet-5"]
+    }
+  ]
+}

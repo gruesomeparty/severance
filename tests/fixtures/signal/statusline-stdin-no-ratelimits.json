@@ -1,0 +1,6 @@
+{
+  "session_id": "sess-old",
+  "model": { "id": "claude-sonnet-5" },
+  "workspace": { "current_dir": "/home/berkay/dev/proj" },
+  "cost": { "total_cost_usd": 0.05 }
+}

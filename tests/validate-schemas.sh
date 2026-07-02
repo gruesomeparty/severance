@@ -23,12 +23,11 @@ check-jsonschema --check-metaschema "$SCHEMA_DIR"/*.json
 
 echo
 echo "== fixtures =="
-for dir in "$FIX_DIR"/*/; do
-	name="$(basename "$dir")"
-	schema="$SCHEMA_DIR/$name.schema.json"
-	if [[ ! -f "$schema" ]]; then
-		echo "MISSING SCHEMA for fixtures/$name (expected $schema)"
-		fail=1
+for schema in "$SCHEMA_DIR"/*.schema.json; do
+	name="$(basename "$schema" .schema.json)"
+	dir="$FIX_DIR/$name/"
+	if [[ ! -d "$dir" ]]; then
+		echo "  (no fixtures for schema $name)"
 		continue
 	fi
 

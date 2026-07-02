@@ -1,0 +1,10 @@
+{
+  "session_id": "sess-abc123",
+  "model": { "id": "claude-sonnet-5", "display_name": "Sonnet 5" },
+  "workspace": { "current_dir": "/home/berkay/dev/one-ocean-cms", "project_dir": "/home/berkay/dev/one-ocean-cms" },
+  "cost": { "total_cost_usd": 1.42, "total_duration_ms": 45000 },
+  "rate_limits": {
+    "five_hour": { "used_percentage": 23.5, "resets_at": 1738425600 },
+    "seven_day": { "used_percentage": 41.2, "resets_at": 1738857600 }
+  }
+}

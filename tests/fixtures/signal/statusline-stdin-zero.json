@@ -1,0 +1,9 @@
+{
+  "session_id": "s0",
+  "workspace": { "current_dir": "/x" },
+  "cost": { "total_cost_usd": 0 },
+  "rate_limits": {
+    "five_hour": { "used_percentage": 0, "resets_at": 1738425600 },
+    "seven_day": { "used_percentage": 0, "resets_at": 1738857600 }
+  }
+}
