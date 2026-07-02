@@ -1,0 +1,12 @@
+{
+  "ts": 1751450400,
+  "signal_tier": "statusline",
+  "rate_limits": { "five_hour": { "used_percentage": 55.0, "resets_at": 1738425600 } },
+  "normalized": {
+    "session": { "utilization": 55.0, "resets_at": "2025-02-01T16:00:00Z" },
+    "weekly": { "utilization": null, "resets_at": null },
+    "extra_usage": { "is_enabled": null, "used_credits": null }
+  },
+  "cost": { "total_cost_usd": 0.88 },
+  "session_id": "sess-xyz"
+}

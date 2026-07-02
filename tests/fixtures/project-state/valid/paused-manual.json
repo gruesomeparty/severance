@@ -1,0 +1,10 @@
+{
+  "name": "sketchbook",
+  "cwd": "/home/berkay/dev/sketchbook",
+  "status": "paused",
+  "reason": "manual",
+  "priority": "high",
+  "preempted_by": null,
+  "paused": true,
+  "preempt_sweep_ts": 1751450000
+}

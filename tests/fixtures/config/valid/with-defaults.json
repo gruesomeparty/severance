@@ -1,0 +1,10 @@
+{
+  "ladder": {
+    "critical": { "session": null, "weekly": null, "reserve": null },
+    "high":     { "session": 80,   "weekly": 90,   "reserve": 55 },
+    "normal":   { "session": 65,   "weekly": 80,   "reserve": null },
+    "low":      { "session": 45,   "weekly": 65,   "reserve": null }
+  },
+  "resume_stagger_minutes": 20,
+  "defaults": { "SEVERANCE_MAX_RESUMES": 5, "SEVERANCE_OAUTH_FALLBACK": 1 }
+}

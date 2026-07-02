@@ -1,0 +1,2 @@
+{ "ts": 1751450000, "signal_tier": "statusline",
+  "normalized": { "session": {"utilization":10,"resets_at":null}, "extra_usage": {"is_enabled":false,"used_credits":null} } }
