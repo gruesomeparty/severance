@@ -1,0 +1,10 @@
+{
+  "ts": 1751450300,
+  "signal_tier": "ccusage",
+  "normalized": {
+    "session": { "utilization": null, "resets_at": null },
+    "weekly": { "utilization": null, "resets_at": null },
+    "extra_usage": { "is_enabled": null, "used_credits": null }
+  },
+  "cost": { "total_cost_usd": 2.75 }
+}

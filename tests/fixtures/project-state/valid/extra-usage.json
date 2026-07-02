@@ -1,0 +1,13 @@
+{
+  "name": "night-market",
+  "cwd": "/home/berkay/dev/night-market",
+  "status": "severed",
+  "reason": "extra_usage",
+  "priority": "normal",
+  "signal_tier": "oauth",
+  "tmux_pane": "%9",
+  "severed_at": "2026-07-02T14:30:00Z",
+  "resume_at": "2026-07-02T18:00:00Z",
+  "resume_count": 0,
+  "paused": false
+}

@@ -1,0 +1,13 @@
+{
+  "name": "solid-dark-visuals",
+  "cwd": "/home/berkay/dev/solid-dark-visuals",
+  "status": "paused",
+  "reason": "preempted",
+  "priority": "low",
+  "preempted_by": "gaia-platform",
+  "session_cost_usd": 0.44,
+  "limit_usd": 2.0,
+  "signal_tier": "statusline",
+  "paused": true,
+  "ts": 1751450600
+}

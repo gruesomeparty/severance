@@ -1,0 +1,13 @@
+{
+  "ts": 1751450100,
+  "signal_tier": "oauth",
+  "normalized": {
+    "session": { "utilization": 37.0, "resets_at": "2026-02-08T04:59:59+00:00" },
+    "weekly": { "utilization": 26.0, "resets_at": "2026-02-12T14:59:59+00:00" },
+    "extra_usage": { "is_enabled": false, "used_credits": null }
+  },
+  "cost": { "total_cost_usd": null },
+  "session_id": null,
+  "model": null,
+  "cwd": null
+}

@@ -1,0 +1,15 @@
+{
+  "name": "solid-dark-visuals",
+  "cwd": "/home/berkay/dev/solid-dark-visuals",
+  "status": "severed",
+  "reason": "cost_limit",
+  "priority": "low",
+  "session_cost_usd": 2.01,
+  "limit_usd": 2.0,
+  "signal_tier": "ccusage",
+  "tmux_pane": "%7",
+  "severed_at": "2026-07-02T14:00:00Z",
+  "resume_at": null,
+  "resume_count": 0,
+  "paused": false
+}

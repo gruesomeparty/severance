@@ -1,0 +1,13 @@
+{
+  "name": "lost-pane",
+  "cwd": "/home/berkay/dev/lost-pane",
+  "status": "orphaned",
+  "reason": "session_util",
+  "priority": "normal",
+  "tmux_pane": "%99",
+  "signal_tier": "statusline",
+  "severed_at": "2026-07-02T10:00:00Z",
+  "resume_at": "2026-07-02T13:00:00Z",
+  "resume_count": 3,
+  "paused": false
+}

@@ -1,0 +1,20 @@
+{
+  "name": "one-ocean-cms",
+  "cwd": "/home/berkay/dev/one-ocean-cms",
+  "status": "severed",
+  "reason": "session_util",
+  "priority": "normal",
+  "preempted_by": null,
+  "session_cost_usd": 2.31,
+  "limit_usd": 3.0,
+  "utilization_at_trip": 81.0,
+  "signal_tier": "statusline",
+  "tmux_pane": "%12",
+  "session_id": "sess-2",
+  "severed_at": "2026-07-02T15:04:00Z",
+  "resume_at": "2026-07-02T18:00:00Z",
+  "resume_count": 1,
+  "blocked_count": 0,
+  "paused": false,
+  "ts": 1751450500
+}

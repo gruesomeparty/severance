@@ -1,0 +1,9 @@
+{
+  "ladder": {
+    "critical": { "session": null, "weekly": null, "reserve": null },
+    "high":     { "session": 85,   "weekly": 95,   "reserve": 60 },
+    "normal":   { "session": 70,   "weekly": 85,   "reserve": null },
+    "low":      { "session": 50,   "weekly": 70,   "reserve": null }
+  },
+  "resume_stagger_minutes": 15
+}
