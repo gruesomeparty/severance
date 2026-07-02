@@ -87,3 +87,23 @@ against the real remote until then.
 
 **Evidence:** `git remote -v`; `gh auth status` (active account `suTerminus`);
 maintainer confirmation.
+
+---
+
+## D5 — `flock` is not available on macOS
+
+**PRD says (§6):** all state writes are atomic (`mktemp` + `mv`) **under `flock`**.
+
+**Reality:** `flock(1)` ships with util-linux (Linux) but is **not present on
+macOS**, and the plugin must run on macOS too (Non-Goals: Linux + macOS only).
+
+**Resolution (M2):** `severance-lib.sh` `sev_locked` uses `flock` when it is on
+`PATH` (Linux) and falls back to a portable **`mkdir` mutex** (atomic directory
+creation, ~20s timeout) otherwise (macOS). Independently, `sev_atomic_write`
+always uses `mktemp` + `mv`, and rename is atomic on POSIX — so whole-file
+replaces (e.g. `usage.json`) never interleave even without a lock; the lock only
+serializes read-modify-write of shared files. Net behavior matches the PRD's
+intent on both platforms.
+
+**Evidence:** `command -v flock` → missing on macOS 15.
+
