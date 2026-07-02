@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/gruesomeparty/severance/schemas/usage-cache.schema.json",
+  "title": "Severance usage cache",
+  "description": "~/.claude/severance/usage.json — signal snapshot written by the statusline bridge or the Tier-2 OAuth fetch. `severance-lib.sh` produces the `normalized` block from whichever tier fired; consumers read only `normalized`. See docs/upstream-snapshots/statusline.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ts", "signal_tier", "normalized"],
+  "properties": {
+    "ts": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix epoch seconds when this snapshot was written."
+    },
+    "signal_tier": {
+      "enum": ["statusline", "oauth", "ccusage"],
+      "description": "Which tier produced these numbers (PRD §3)."
+    },
+    "rate_limits": {
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "description": "Raw Tier-1 rate_limits object, persisted verbatim so a future shape change is recoverable. Absent for oauth/ccusage tiers."
+    },
+    "normalized": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["session", "weekly", "extra_usage"],
+      "description": "Tier-agnostic view every consumer reads.",
+      "properties": {
+        "session": { "$ref": "#/$defs/window" },
+        "weekly": { "$ref": "#/$defs/window" },
+        "extra_usage": { "$ref": "#/$defs/extraUsage" }
+      }
+    },
+    "cost": {
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "description": "Cost block (statusline `cost`, or synthesized from ccusage).",
+      "properties": {
+        "total_cost_usd": { "type": ["number", "null"], "minimum": 0 }
+      }
+    },
+    "session_id": { "type": ["string", "null"] },
+    "model": { "type": ["string", "null"] },
+    "cwd": { "type": ["string", "null"] }
+  },
+  "$defs": {
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["utilization", "resets_at"],
+      "description": "A rate-limit window. Values may be null when the window is absent from the signal (statusline windows can be independently absent).",
+      "properties": {
+        "utilization": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+        "resets_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "ISO-8601 UTC. Normalizer converts statusline epoch seconds to this form."
+        }
+      }
+    },
+    "extraUsage": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["is_enabled", "used_credits"],
+      "description": "Usage-credit state. Tier-2 (OAuth) only; is_enabled/used_credits are null under Tier-1/Tier-3.",
+      "properties": {
+        "is_enabled": { "type": ["boolean", "null"] },
+        "used_credits": { "type": ["number", "null"], "minimum": 0 }
+      }
+    }
+  }
+}

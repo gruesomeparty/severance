@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/gruesomeparty/severance/schemas/project-state.schema.json",
+  "title": "Severance project state",
+  "description": "~/.claude/severance/projects/<slug>.json — per-project state written by gate.sh, heartbeat.sh, resume.sh and the menu bar app. This directory IS the API between plugin and app (PRD §6.2).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "cwd", "status", "priority", "paused"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Sanitized basename of cwd (the slug)."
+    },
+    "cwd": { "type": "string", "minLength": 1 },
+    "status": {
+      "enum": ["active", "severed", "orphaned", "paused"],
+      "description": "active -> severed -> active/orphaned; paused is orthogonal."
+    },
+    "reason": {
+      "type": ["string", "null"],
+      "enum": ["session_util", "weekly_util", "cost_limit", "extra_usage", "manual", "preempted", null],
+      "description": "Why the project is in its current non-active state; null when active."
+    },
+    "priority": {
+      "enum": ["critical", "high", "normal", "low"],
+      "description": "Ladder band the project declared."
+    },
+    "preempted_by": {
+      "type": ["string", "null"],
+      "description": "Slug of the higher-priority project that preempted this one (§5.5)."
+    },
+    "session_cost_usd": { "type": ["number", "null"], "minimum": 0 },
+    "limit_usd": { "type": ["number", "null"], "minimum": 0 },
+    "utilization_at_trip": { "type": ["number", "null"], "minimum": 0, "maximum": 100 },
+    "signal_tier": {
+      "type": ["string", "null"],
+      "enum": ["statusline", "oauth", "ccusage", null]
+    },
+    "tmux_pane": {
+      "type": ["string", "null"],
+      "description": "$TMUX_PANE at trip time, e.g. \"%12\"."
+    },
+    "session_id": { "type": ["string", "null"] },
+    "severed_at": { "type": ["string", "null"], "format": "date-time" },
+    "resume_at": { "type": ["string", "null"], "format": "date-time" },
+    "resume_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Auto-resume attempts so far (cap SEVERANCE_MAX_RESUMES, default 3)."
+    },
+    "blocked_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "R3: consecutive blocked tool calls this session; escalate + stop scheduling resumes at 5."
+    },
+    "preempt_sweep_ts": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "R5: epoch seconds of this preemptor's last preemption sweep (throttle: at most once / 60s)."
+    },
+    "ts": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Epoch seconds of the last heartbeat/update (freshness for the dashboard)."
+    },
+    "paused": {
+      "type": "boolean",
+      "description": "Pause flag, orthogonal to status: set by the app/user (manual) or by a preemption sweep (§5.5). The gate trips while paused."
+    }
+  }
+}
