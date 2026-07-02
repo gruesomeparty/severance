@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Severance — menu bar panel mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@300;500&family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ── DARK: the MDR terminal ─────────────────────── */
+  :root, [data-theme="dark"]{
+    --desk:        #071523;
+    --desk-glow:   rgba(88,196,229,.06);
+    --panel-top:   #0D2338;
+    --panel:       #0B1F33;
+    --panel-brd:   rgba(159,232,255,.16);
+    --well:        #081A2C;          /* gauge wells stay dark in BOTH themes */
+    --well-brd:    rgba(159,232,255,.14);
+    --ink:         #E8F1F4;
+    --ink-mute:    #46647D;
+    --ink-soft:    #8fa9bd;
+    --accent:      #9FE8FF;
+    --accent-dim:  #58C4E5;
+    --accent-bg:   rgba(159,232,255,.09);
+    --accent-brd:  rgba(159,232,255,.3);
+    --hairline:    rgba(159,232,255,.09);
+    --row-hover:   rgba(159,232,255,.05);
+    --ok:          #7FD6A4;
+    --amber:       #E8B34B;
+    --severed:     #E06055;
+    --mint:        #7FD6A4;
+    --bar-bg:      rgba(159,232,255,.10);
+    --glow:        0 0 14px rgba(159,232,255,.55), 0 0 2px rgba(159,232,255,.9);
+    --macbar-bg:   rgba(10,22,36,.92);
+    --macbar-ink:  #9db4c6;
+    --shadow:      0 24px 60px rgba(0,0,0,.55);
+  }
+  /* ── LIGHT: the severed floor ───────────────────── */
+  [data-theme="light"]{
+    --desk:        #DCE4E1;          /* fluorescent office */
+    --desk-glow:   rgba(31,110,99,.05);
+    --panel-top:   #FBFDFC;
+    --panel:       #F2F6F4;
+    --panel-brd:   rgba(22,48,59,.14);
+    --well:        #0B1F33;          /* terminals stay navy on the bright floor */
+    --well-brd:    rgba(22,48,59,.25);
+    --ink:         #16303B;
+    --ink-mute:    #6B8189;
+    --ink-soft:    #44606C;
+    --accent:      #1F6E63;          /* Lumon green-teal */
+    --accent-dim:  #2F8577;
+    --accent-bg:   rgba(31,110,99,.08);
+    --accent-brd:  rgba(31,110,99,.35);
+    --hairline:    rgba(22,48,59,.10);
+    --row-hover:   rgba(31,110,99,.06);
+    --ok:          #1F8A5A;
+    --amber:       #B0761A;
+    --severed:     #C24A40;
+    --mint:        #2F8577;
+    --bar-bg:      rgba(22,48,59,.12);
+    --glow:        0 0 14px rgba(159,232,255,.55), 0 0 2px rgba(159,232,255,.9);
+    --macbar-bg:   rgba(244,248,246,.92);
+    --macbar-ink:  #55707C;
+    --shadow:      0 24px 55px rgba(22,48,59,.22);
+  }
+
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    background:var(--desk);
+    min-height:100vh;
+    font-family:'Archivo',sans-serif;
+    color:var(--ink);
+    display:flex;flex-direction:column;align-items:center;
+    background-image:radial-gradient(ellipse 80% 60% at 50% -10%, var(--desk-glow), transparent 60%);
+    transition:background .25s ease;
+  }
+
+  /* ── mock macOS menu bar ─────────────────────────── */
+  .macbar{
+    width:100%;
+    background:var(--macbar-bg);
+    border-bottom:1px solid var(--hairline);
+    backdrop-filter:blur(10px);
+    display:flex;justify-content:flex-end;align-items:center;
+    gap:22px;padding:7px 18px;
+    font-size:12.5px;color:var(--macbar-ink);
+  }
+  .macbar .item{opacity:.55;}
+  .macbar .sev-item{
+    opacity:1;color:var(--accent);
+    font-family:'IBM Plex Mono',monospace;font-size:12px;
+    background:var(--accent-bg);
+    border:1px solid var(--accent-brd);
+    border-radius:5px;padding:2px 9px;
+  }
+  [data-theme="dark"] .macbar .sev-item{text-shadow:0 0 8px rgba(159,232,255,.5);}
+
+  /* ── controls ────────────────────────────────────── */
+  .demo-controls{
+    position:fixed;left:16px;bottom:16px;display:flex;gap:8px;z-index:60;
+  }
+  .demo-controls button{
+    font-family:'IBM Plex Mono',monospace;font-size:11px;
+    color:var(--ink-soft);background:var(--panel);
+    border:1px solid var(--panel-brd);border-radius:7px;
+    padding:7px 12px;cursor:pointer;
+  }
+  .demo-controls button:hover{color:var(--accent);border-color:var(--accent-brd);}
+  .demo-controls button:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+
+  /* ── panel ───────────────────────────────────────── */
+  .stage{padding:14px 16px 60px;display:flex;flex-direction:column;align-items:flex-end;width:100%;max-width:560px;}
+  .panel{
+    width:372px;max-width:100%;
+    background:linear-gradient(180deg,var(--panel-top) 0%,var(--panel) 22%);
+    border:1px solid var(--panel-brd);
+    border-radius:13px;
+    box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.06);
+    overflow:hidden;position:relative;
+    transition:background .25s ease;
+  }
+
+  .head{display:flex;align-items:baseline;justify-content:space-between;padding:14px 16px 10px;}
+  .wordmark{
+    font-family:'Spectral',serif;font-weight:300;font-size:15px;
+    letter-spacing:.34em;text-transform:uppercase;color:var(--ink);
+  }
+  .wordmark b{font-weight:500;color:var(--accent);}
+  [data-theme="dark"] .wordmark b{text-shadow:0 0 10px rgba(159,232,255,.45);}
+  .signal{font-family:'IBM Plex Mono',monospace;font-size:9.5px;letter-spacing:.08em;color:var(--ink-mute);text-transform:uppercase;}
+  .signal .dot{color:var(--ok);}
+  [data-theme="dark"] .signal .dot{text-shadow:0 0 6px rgba(127,214,164,.7);}
+
+  /* ── waffle party banner (easter egg) ────────────── */
+  .waffle{
+    display:none;
+    margin:0 14px 10px;
+    border:1px solid rgba(127,214,164,.45);
+    background:linear-gradient(90deg, rgba(127,214,164,.12), rgba(159,232,255,.08));
+    border-radius:9px;
+    padding:9px 12px;
+    align-items:center;gap:10px;
+    position:relative;overflow:hidden;
+  }
+  [data-theme="light"] .waffle{
+    border-color:rgba(31,110,99,.4);
+    background:linear-gradient(90deg, rgba(47,133,119,.10), rgba(31,110,99,.05));
+  }
+  .waffle.show{display:flex;}
+  .waffle .wf-ico{font-size:20px;line-height:1;filter:drop-shadow(0 0 6px rgba(232,179,75,.6));}
+  .waffle .wf-txt{flex:1;}
+  .waffle .wf-title{
+    font-family:'Spectral',serif;font-weight:500;font-size:13px;
+    color:var(--mint);letter-spacing:.06em;
+  }
+  .waffle .wf-sub{font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--ink-mute);margin-top:1px;}
+  .waffle .wf-close{
+    background:none;border:none;color:var(--ink-mute);cursor:pointer;
+    font-size:13px;padding:2px 4px;
+  }
+  .waffle .wf-close:hover{color:var(--ink);}
+  /* tiny falling waffles inside the banner only */
+  .waffle .confetto{
+    position:absolute;top:-14px;font-size:9px;opacity:.85;pointer-events:none;
+    animation:wfall 1.8s linear forwards;
+  }
+  @keyframes wfall{to{transform:translateY(64px) rotate(140deg);opacity:0;}}
+  @media (prefers-reduced-motion: reduce){.waffle .confetto{display:none;}}
+
+  /* ── refinement quota gauges (signature) ─────────── */
+  .quota{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:2px 14px 14px;}
+  .bin{
+    position:relative;background:var(--well);
+    border:1px solid var(--well-brd);border-radius:9px;
+    padding:12px 12px 11px;overflow:hidden;
+  }
+  .bin::after{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:repeating-linear-gradient(0deg, rgba(159,232,255,.045) 0 1px, transparent 1px 3px);
+    mix-blend-mode:screen;
+  }
+  .bin .lbl{font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;color:#46647D;margin-bottom:6px;font-weight:600;}
+  .bin .pct{
+    font-family:'Spectral',serif;font-weight:300;font-size:38px;line-height:1;
+    color:#9FE8FF;text-shadow:var(--glow);font-variant-numeric:tabular-nums;
+  }
+  .bin .pct small{font-size:17px;color:#58C4E5;margin-left:2px;}
+  .bin.warn .pct{color:#E8B34B;text-shadow:0 0 14px rgba(232,179,75,.5);}
+  .ticks{display:flex;gap:2.5px;margin:10px 0 7px;height:13px;align-items:flex-end;}
+  .ticks i{flex:1;background:rgba(159,232,255,.12);border-radius:1px;height:100%;}
+  .ticks i.f{background:#58C4E5;box-shadow:0 0 5px rgba(88,196,229,.6);}
+  .bin.warn .ticks i.f{background:#E8B34B;box-shadow:0 0 5px rgba(232,179,75,.55);}
+  .ticks i.mark{background:transparent;border-left:1px dashed #E06055;border-radius:0;flex:0 0 1px;}
+  .bin .reset{font-family:'IBM Plex Mono',monospace;font-size:10px;color:#46647D;}
+  .bin .reset b{color:#8fa9bd;font-weight:500;}
+  /* 5h reset: music dance experience (micro) */
+  .bin .reset.mde{color:#7FD6A4;}
+  .bin .reset.mde b{color:#7FD6A4;}
+  @media (prefers-reduced-motion: no-preference){
+    .ticks i.refill{animation:refill .5s ease both;}
+    @keyframes refill{from{transform:scaleY(.15);opacity:.3;}to{transform:scaleY(1);opacity:1;}}
+    .reset.mde .note{display:inline-block;animation:bounce 1.1s ease-in-out infinite;}
+    @keyframes bounce{0%,100%{transform:translateY(0);}30%{transform:translateY(-2px) rotate(-8deg);}60%{transform:translateY(1px) rotate(6deg);}}
+  }
+
+  /* ── project list ────────────────────────────────── */
+  .sect{
+    padding:9px 16px 6px;font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;
+    color:var(--ink-mute);font-weight:600;display:flex;justify-content:space-between;align-items:center;
+  }
+  .sect span:last-child{letter-spacing:.05em;font-family:'IBM Plex Mono',monospace;opacity:.7;text-transform:none;}
+  .rows{padding:0 8px 8px;}
+  .row{
+    display:grid;grid-template-columns:8px 1fr auto;
+    grid-template-areas:"led name chips" "led meta chips" "led bar bar";
+    column-gap:10px;row-gap:3px;padding:9px 8px;border-radius:8px;align-items:center;
+  }
+  .row + .row{border-top:1px solid var(--hairline);}
+  .row:hover{background:var(--row-hover);}
+  .led{grid-area:led;width:7px;height:7px;border-radius:50%;align-self:start;margin-top:5px;}
+  .led.active{background:var(--ok);}
+  .led.severed{background:var(--severed);}
+  .led.preempt{background:var(--amber);}
+  [data-theme="dark"] .led.active{box-shadow:0 0 7px rgba(127,214,164,.8);}
+  [data-theme="dark"] .led.severed{box-shadow:0 0 7px rgba(224,96,85,.7);}
+  [data-theme="dark"] .led.preempt{box-shadow:0 0 7px rgba(232,179,75,.7);}
+  .name{grid-area:name;font-size:13px;font-weight:600;letter-spacing:.01em;}
+  .meta{grid-area:meta;font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ink-mute);}
+  .meta em{font-style:normal;color:var(--ink-soft);}
+  .chips{grid-area:chips;display:flex;gap:5px;align-self:start;}
+  .chip{
+    font-family:'IBM Plex Mono',monospace;font-size:8.5px;letter-spacing:.1em;
+    padding:2.5px 6px;border-radius:4px;border:1px solid;text-transform:uppercase;font-weight:500;
+  }
+  .chip.crit {color:var(--accent);border-color:var(--accent-brd);background:var(--accent-bg);}
+  .chip.high {color:var(--ink-soft);border-color:currentColor;}
+  .chip.norm, .chip.low {color:var(--ink-mute);border-color:currentColor;}
+  .chip.st-active{color:var(--ok);border-color:currentColor;}
+  .chip.st-severed{color:var(--severed);border-color:currentColor;background:rgba(224,96,85,.08);}
+  .chip.st-preempt{color:var(--amber);border-color:currentColor;}
+  .bar{grid-area:bar;height:3px;border-radius:2px;background:var(--bar-bg);position:relative;margin-top:2px;}
+  .bar i{position:absolute;inset:0 auto 0 0;border-radius:2px;background:var(--accent-dim);}
+  .bar.hot i{background:var(--amber);}
+  .bar .cap{position:absolute;top:-2.5px;width:1px;height:8px;background:var(--severed);}
+  .resume-line{grid-area:bar;display:flex;justify-content:space-between;align-items:center;margin-top:2px;}
+  .resume-line .cd{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--amber);}
+  .btn{
+    font-family:'Archivo';font-size:10.5px;font-weight:600;
+    color:var(--accent);background:var(--accent-bg);
+    border:1px solid var(--accent-brd);border-radius:5px;
+    padding:3px 9px;cursor:pointer;letter-spacing:.03em;
+  }
+  .btn:hover{filter:brightness(1.15);}
+  .btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+
+  .foot{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:9px 16px 11px;border-top:1px solid var(--hairline);
+    font-family:'IBM Plex Mono',monospace;font-size:9.5px;color:var(--ink-mute);opacity:.85;
+  }
+  .foot .egg{cursor:default;}
+  .foot .egg:hover{color:var(--amber);}
+
+  /* ── mock macOS notification (the other egg surface) */
+  .notif{
+    position:fixed;top:46px;right:16px;width:330px;z-index:50;
+    background:var(--panel-top);
+    border:1px solid var(--panel-brd);border-radius:14px;
+    box-shadow:var(--shadow);
+    padding:11px 13px;display:none;gap:11px;align-items:center;
+    transform:translateX(20px);opacity:0;
+  }
+  .notif.show{display:flex;animation:slidein .35s ease forwards;}
+  @keyframes slidein{to{transform:none;opacity:1;}}
+  @media (prefers-reduced-motion: reduce){.notif.show{animation:none;transform:none;opacity:1;}}
+  .notif .n-ico{
+    width:36px;height:36px;border-radius:9px;flex:0 0 36px;
+    background:var(--well);display:grid;place-items:center;font-size:19px;
+  }
+  .notif .n-app{font-size:11px;font-weight:600;color:var(--ink-mute);letter-spacing:.12em;text-transform:uppercase;}
+  .notif .n-title{font-size:13px;font-weight:600;margin-top:1px;}
+  .notif .n-body{font-size:12px;color:var(--ink-soft);margin-top:1px;}
+
+  .caption{margin-top:22px;max-width:372px;font-size:12px;line-height:1.6;color:var(--ink-mute);text-align:left;align-self:flex-end;}
+  .caption b{color:var(--ink-soft);font-weight:600;}
+
+  @media (prefers-reduced-motion: no-preference){
+    .bin.warn .pct{animation:breathe 3.2s ease-in-out infinite;}
+    @keyframes breathe{0%,100%{text-shadow:0 0 14px rgba(232,179,75,.5);}50%{text-shadow:0 0 22px rgba(232,179,75,.85);}}
+  }
+</style>
+</head>
+<body>
+
+  <div class="macbar">
+    <span class="item">Ghostty</span>
+    <span class="sev-item">◦ 5h 62%</span>
+    <span class="item">⌥⇧</span>
+    <span class="item">Do 3. Jul</span>
+    <span class="item">14:23</span>
+  </div>
+
+  <!-- mock macOS notification: fires on 7d reset -->
+  <div class="notif" id="notif" role="status">
+    <div class="n-ico">🧇</div>
+    <div>
+      <div class="n-app">Severance</div>
+      <div class="n-title">Waffle party</div>
+      <div class="n-body">Weekly quota refreshed. All refiners may return to the floor.</div>
+    </div>
+  </div>
+
+  <div class="stage">
+    <div class="panel" role="dialog" aria-label="Severance panel">
+
+      <div class="head">
+        <div class="wordmark">Seve<b>rance</b></div>
+        <div class="signal"><span class="dot">●</span> statusline · official</div>
+      </div>
+
+      <!-- in-panel waffle banner: one-shot on 7d reset -->
+      <div class="waffle" id="waffle">
+        <span class="wf-ico">🧇</span>
+        <span class="wf-txt">
+          <span class="wf-title">Waffle party</span>
+          <span class="wf-sub">7d quota → 0% · music dance experience optional</span>
+        </span>
+        <button class="wf-close" onclick="hideWaffle()" aria-label="Dismiss">✕</button>
+      </div>
+
+      <div class="quota">
+        <div class="bin warn" id="bin5">
+          <div class="lbl">5h Refinement Quota</div>
+          <div class="pct" id="pct5">62<small>%</small></div>
+          <div class="ticks" id="ticks5" aria-hidden="true">
+            <i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i class="mark"></i><i></i><i></i><i></i><i></i><i></i>
+          </div>
+          <div class="reset" id="reset5">resets <b>17:58</b> · in 3h 35m</div>
+        </div>
+        <div class="bin" id="bin7">
+          <div class="lbl">7d Refinement Quota</div>
+          <div class="pct" id="pct7">41<small>%</small></div>
+          <div class="ticks" id="ticks7" aria-hidden="true">
+            <i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i class="mark"></i><i></i><i></i>
+          </div>
+          <div class="reset">resets <b>Tue 09:00</b></div>
+        </div>
+      </div>
+
+      <div class="sect"><span>Refiners</span><span>4 tracked</span></div>
+      <div class="rows">
+
+        <div class="row">
+          <span class="led active" aria-hidden="true"></span>
+          <span class="name">gaia-platform</span>
+          <span class="meta">$4.87 this session · <em>outie budget</em></span>
+          <span class="chips"><span class="chip crit">Crit</span><span class="chip st-active">Active</span></span>
+        </div>
+
+        <div class="row">
+          <span class="led active" aria-hidden="true"></span>
+          <span class="name">ghost-bazaar</span>
+          <span class="meta">$1.12 / $5.00</span>
+          <span class="chips"><span class="chip high">High</span><span class="chip st-active">Active</span></span>
+          <span class="bar"><i style="width:22%"></i><span class="cap" style="left:100%"></span></span>
+        </div>
+
+        <div class="row">
+          <span class="led severed" aria-hidden="true"></span>
+          <span class="name">one-ocean-cms</span>
+          <span class="meta">severed · session_util 81% · handover ✓</span>
+          <span class="chips"><span class="chip norm">Norm</span><span class="chip st-severed">Severed</span></span>
+          <span class="resume-line">
+            <span class="cd">returns to the floor in 3h 35m</span>
+            <button class="btn">Resume now</button>
+          </span>
+        </div>
+
+        <div class="row">
+          <span class="led preempt" aria-hidden="true"></span>
+          <span class="name">solid-dark-visuals</span>
+          <span class="meta">preempted by <em>gaia-platform</em> · $0.44 / $2.00</span>
+          <span class="chips"><span class="chip low">Low</span><span class="chip st-preempt">Paused</span></span>
+          <span class="bar hot"><i style="width:22%"></i><span class="cap" style="left:100%"></span></span>
+        </div>
+
+      </div>
+
+      <div class="foot">
+        <span>~/.claude/severance</span>
+        <span class="egg" title="weekly quota refreshed">please enjoy each window equally</span>
+      </div>
+
+    </div>
+
+    <p class="caption">
+      <b>Dark = MDR terminal, light = severed floor.</b> In light mode the panel becomes
+      fluorescent office white with Lumon green-teal — but the two quota wells stay navy CRT
+      islands, exactly like terminals on the bright severed floor. Perk hierarchy: a 5h reset
+      earns a five-second <i>music dance experience</i> (bouncing ♪ caption, cascading tick
+      refill, menu bar briefly reads ◦ 5h ♪); only the 7d reset earns the full waffle party
+      with notification and banner.
+    </p>
+  </div>
+
+  <div class="demo-controls">
+    <button onclick="toggleTheme()">◐ theme</button>
+    <button onclick="mde()">♪ trigger 5h reset</button>
+    <button onclick="waffleParty()">🧇 trigger 7d reset</button>
+  </div>
+
+<script>
+  function toggleTheme(){
+    const h=document.documentElement;
+    h.dataset.theme = h.dataset.theme==='dark' ? 'light' : 'dark';
+  }
+  // default to system preference
+  if(window.matchMedia('(prefers-color-scheme: light)').matches){
+    document.documentElement.dataset.theme='light';
+  }
+
+  function hideWaffle(){document.getElementById('waffle').classList.remove('show');}
+
+  function mde(){
+    const bin=document.getElementById('bin5');
+    const pct=document.getElementById('pct5');
+    const ticks=[...document.querySelectorAll('#ticks5 i')].filter(t=>!t.classList.contains('mark'));
+    const reset=document.getElementById('reset5');
+    const sev=document.querySelector('.sev-item');
+    const reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // window resets: warning off, gauge to 0
+    bin.classList.remove('warn');
+    pct.innerHTML='0<small>%</small>';
+    ticks.forEach(t=>t.classList.remove('f','refill'));
+
+    // five-second perk: caption + menu bar note
+    reset.classList.add('mde');
+    reset.innerHTML='<span class="note">♪</span> music dance experience · 5 min';
+    sev.textContent='◦ 5h ♪';
+
+    // cascading refill of the first ticks as the fresh window starts
+    if(!reduced){
+      ticks.slice(0,3).forEach((t,i)=>setTimeout(()=>{t.classList.add('f','refill');},900+i*450));
+    }else{
+      ticks.slice(0,3).forEach(t=>t.classList.add('f'));
+    }
+    setTimeout(()=>{pct.innerHTML='4<small>%</small>';},1800);
+
+    // back to business
+    setTimeout(()=>{
+      reset.classList.remove('mde');
+      reset.innerHTML='resets <b>22:58</b> · in 5h 0m';
+      sev.textContent='◦ 5h 4%';
+    },5000);
+  }
+
+  function waffleParty(){
+    // 7d gauge drops to 0
+    document.getElementById('pct7').innerHTML='0<small>%</small>';
+    document.querySelectorAll('#ticks7 i.f').forEach(t=>t.classList.remove('f'));
+    // in-panel banner
+    const w=document.getElementById('waffle');
+    w.classList.add('show');
+    // banner-contained waffle drop (skipped under reduced motion via CSS)
+    if(!window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+      for(let i=0;i<9;i++){
+        const c=document.createElement('span');
+        c.className='confetto';c.textContent='🧇';
+        c.style.left=(6+Math.random()*88)+'%';
+        c.style.animationDelay=(Math.random()*0.9)+'s';
+        w.appendChild(c);
+        setTimeout(()=>c.remove(),2800);
+      }
+    }
+    // macOS notification
+    const n=document.getElementById('notif');
+    n.classList.add('show');
+    setTimeout(()=>n.classList.remove('show'),5200);
+    // auto-dismiss banner
+    setTimeout(hideWaffle,9000);
+  }
+</script>
+</body>
+</html>

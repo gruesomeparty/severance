@@ -1,0 +1,19 @@
+# Severance handover + local runtime state — never committed
+.severance/
+
+# macOS
+.DS_Store
+
+# Swift / SwiftPM (menu bar app, M5)
+.build/
+apps/menubar/.build/
+apps/menubar/.swiftpm/
+*.xcodeproj
+
+# Python (local schema validation)
+.venv/
+venv/
+__pycache__/
+
+# Node (tooling only)
+node_modules/
