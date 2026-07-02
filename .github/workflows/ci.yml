@@ -1,0 +1,76 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Least privilege; jobs only read the checkout.
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Shell quality gate (PRD §8.1). shellcheck at error severity + shfmt -d.
+  # Grows as plugin/scripts/ fills in M2/M3; already covers the tests/ helpers.
+  lint-shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck + shfmt
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends shellcheck
+          # renovate: datasource=github-releases depName=mvdan/sh
+          SHFMT_VERSION=v3.13.1
+          curl -fsSL "https://github.com/mvdan/sh/releases/download/${SHFMT_VERSION}/shfmt_${SHFMT_VERSION}_linux_amd64" -o shfmt
+          chmod +x shfmt
+          sudo mv shfmt /usr/local/bin/shfmt
+          shellcheck --version
+          shfmt --version
+      - name: Lint shell scripts
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find plugin/scripts tests -type f -name '*.sh' 2>/dev/null | sort)
+          if [[ ${#files[@]} -eq 0 ]]; then
+            echo "no shell scripts to lint"
+            exit 0
+          fi
+          printf 'linting:\n'
+          printf '  %s\n' "${files[@]}"
+          echo "== shellcheck (severity=error) =="
+          shellcheck --severity=error "${files[@]}"
+          echo "== shfmt -d =="
+          shfmt -d "${files[@]}"
+
+  # Contract gate (PRD §8.1). Every schema self-checks; every valid fixture
+  # passes and every invalid fixture is rejected.
+  validate-json:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install check-jsonschema
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install check-jsonschema==0.37.4
+          check-jsonschema --version
+      - name: Validate schemas + fixtures
+        run: bash tests/validate-schemas.sh
+      # TODO(M4): validate plugin/.claude-plugin/plugin.json,
+      # .claude-plugin/marketplace.json and plugin/hooks/hooks.json here.
+
+  # Skill frontmatter gate (PRD §8.1). No-op until skills land in M4.
+  skill-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint SKILL.md frontmatter
+        run: bash tests/lint-skills.sh
