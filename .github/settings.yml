@@ -1,0 +1,73 @@
+# .github/settings.yml — Probot "Settings" GitHub App (https://github.com/apps/settings)
+#
+# Declarative repository + branch-protection config, synced from the default
+# branch to GitHub whenever the app is installed. Schema verified 2026-07-03
+# against repository-settings/app@master:
+#   docs/plugins/repository.md  and  docs/plugins/branches.md
+#
+# This file only takes effect once the Settings app is installed on the repo
+# (and, for branch protection, once the repo is public or on a paid plan —
+# classic protection is unavailable on free private repos). The repository-level
+# merge settings below are ALSO applied immediately out-of-band via
+# `gh api -X PATCH repos/...` so linear history is enforced today; keeping them
+# here makes them declarative, reviewable, and drift-proof.
+
+repository:
+  # Linear history for trunk-based development: forbid merge commits on main so
+  # every merge is a squash or rebase (both keep history linear). This is the
+  # part that takes effect immediately via the merge-method settings.
+  allow_merge_commit: false
+  allow_squash_merge: true
+  allow_rebase_merge: true
+  # Delete the PR head branch after merge to keep the branch list tidy.
+  delete_branch_on_merge: true
+
+branches:
+  - name: main
+    # Branch protection. The Settings app maps this object straight onto the REST
+    # branch-protection endpoint (repos.updateBranchProtection), so any documented
+    # protection key is accepted — including allow_force_pushes / allow_deletions,
+    # which aren't in the app's example but are valid API fields it passes through.
+    #
+    # Per the app docs, each of the four "required" top-level elements
+    # (required_pull_request_reviews, required_status_checks, enforce_admins,
+    # restrictions) MUST be present or none of the protection is applied — so we
+    # set the ones we don't use to null.
+    protection:
+      # Require a PR before merging, but with 0 approvals: this is a solo project,
+      # so the maintainer self-merges after CI is green. Keeping the PR flow (vs.
+      # allowing direct pushes to main) is what makes the status checks below gate
+      # anything at all.
+      required_pull_request_reviews:
+        required_approving_review_count: 0
+        dismiss_stale_reviews: false
+        require_code_owner_reviews: false
+      # Gate merges on the CI jobs that ALWAYS run on a PR. strict=true requires
+      # the branch to be up to date with main before merging, which reinforces
+      # linear history. Contexts are GitHub check names (= the CI job ids).
+      required_status_checks:
+        strict: true
+        contexts:
+          - lint-shell # ci.yml — shellcheck (severity=error) + shfmt -d
+          - validate-json # ci.yml — schemas, fixtures, and vendored manifests
+          - skill-lint # ci.yml — SKILL.md frontmatter lint
+          - test-plugin # ci.yml — bats suite (synthetic, no network)
+          - test-app # ci.yml — swift build + test on macOS
+          - conventional-commits # commitlint.yml — Conventional Commits check
+          # Deliberately NOT required:
+          #   plugin-validate  — continue-on-error: true; advisory, would never block.
+          #   analyze (CodeQL) — its job is `if: visibility == public`, so it is
+          #                      SKIPPED while this repo is private; a required check
+          #                      that never reports would block every merge. Add it
+          #                      here once the repo goes public (docs/DEVIATIONS.md D4).
+      # Solo maintainer: don't enforce protection against admins, so the owner
+      # keeps an escape hatch for hotfixes and isn't locked out.
+      enforce_admins: false
+      # The point of this file: keep main linear (no merge commits merged in).
+      required_linear_history: true
+      # No push allow-list — user-owned repo; user/team push restrictions require
+      # an organization. null = anyone with write access (just the owner here).
+      restrictions: null
+      # Never allow history rewrites or deletion of main.
+      allow_force_pushes: false
+      allow_deletions: false
