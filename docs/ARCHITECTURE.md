@@ -38,6 +38,8 @@ statusline (official rate_limits)          oauth endpoint (fallback)      ccusag
   snapshot records `signal_tier` (`statusline` > `oauth` > `ccusage`).
 - `config.json` — the priority ladder + `resume_stagger_minutes`.
 - `projects/<slug>.json` — per-project state (one file per opted-in project).
+- `sessions/<session_id>.json` — a session's own cost, so the cost cap is
+  per-session rather than per-repo-last-writer (see [DEVIATIONS.md](DEVIATIONS.md) D6).
 
 Contracts live in [`../schemas/`](../schemas); see [SIGNALS.md](SIGNALS.md) for
 the tiers and [DEVIATIONS.md](DEVIATIONS.md) for where reality differs from the PRD.
