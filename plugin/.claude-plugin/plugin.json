@@ -1,6 +1,6 @@
 {
   "name": "severance",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Sever side-project Claude Code spend from work spend: gate opted-in projects on official utilization, have the agent write a handover, stop before usage-credit billing, and auto-resume in the original tmux pane at window reset.",
   "author": {
     "name": "gruesomeparty",
