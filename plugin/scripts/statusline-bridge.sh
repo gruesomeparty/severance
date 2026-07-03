@@ -39,6 +39,20 @@ _persist_signal() {
 	printf '%s' "$usage" | jq -e . >/dev/null 2>&1 || return 0
 	printf '%s' "$usage" |
 		sev_locked "$state_dir/usage.json.lock" sev_atomic_write "$state_dir/usage.json" || return 0
+
+	# Per-session cost record (D6): the gate's cost cap must read THIS session's
+	# spend, not a sibling's, since concurrent same-repo sessions share usage.json.
+	local sid scf
+	sid="$(jq -r '.session_id // empty' <"$tmp_in" 2>/dev/null || true)"
+	if [ -n "$sid" ]; then
+		scf="$(sev_session_cost_file "$sid")"
+		mkdir -p "$(dirname "$scf")" # the lock needs its parent dir to exist
+		# shellcheck disable=SC2016  # $ts is a jq variable (--argjson), not shell
+		jq --argjson ts "$(sev_now)" \
+			'{ts: $ts, session_id: .session_id, cost: (.cost // {total_cost_usd: null})}' \
+			<"$tmp_in" 2>/dev/null |
+			sev_locked "$scf.lock" sev_atomic_write "$scf" || true
+	fi
 }
 _persist_signal || true
 

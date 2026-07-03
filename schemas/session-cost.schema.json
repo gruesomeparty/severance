@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/gruesomeparty/severance/schemas/session-cost.schema.json",
+  "title": "Severance per-session cost",
+  "description": "~/.claude/severance/sessions/<session_id>.json — a single session's own cost, written by the statusline bridge. The gate's cost cap reads THIS session's file rather than the shared usage.json, which concurrent same-repo sessions clobber (D6).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ts", "session_id", "cost"],
+  "properties": {
+    "ts": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix epoch seconds when this session's cost was last written."
+    },
+    "session_id": { "type": "string", "minLength": 1 },
+    "cost": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "total_cost_usd": { "type": ["number", "null"], "minimum": 0 }
+      }
+    }
+  }
+}

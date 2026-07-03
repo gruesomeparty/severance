@@ -157,6 +157,16 @@ sev_project_state_file() {
 	printf '%s\n' "$(sev_state_dir)/projects/$1.json"
 }
 
+# sev_session_cost_file <session_id> — path to a session's per-session cost record
+# (sanitized filename). Cost is per-session, so the cost cap reads THIS session's
+# file rather than the shared usage.json, which is clobbered by concurrent
+# same-repo sessions (last-writer-wins). See docs/DEVIATIONS.md D6.
+sev_session_cost_file() {
+	local sid
+	sid="$(printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '-')"
+	printf '%s\n' "$(sev_state_dir)/sessions/$sid.json"
+}
+
 # _sev_merge_rmw <statefile> <jq_filter> [jq_args...] — read-modify-write body,
 # always run under sev_state_merge's lock. Resets an unparseable file to {}.
 _sev_merge_rmw() {
