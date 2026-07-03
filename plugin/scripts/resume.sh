@@ -48,8 +48,14 @@ _resume_one() {
 	pane="$(jq -r '.tmux_pane // empty' "$sf" 2>/dev/null || true)"
 	rc="$(jq -r '.resume_count // 0' "$sf" 2>/dev/null || echo 0)"
 	if _pane_alive "$pane"; then
-		"${SEV_TMUX[@]}" send-keys -t "$pane" \
-			"Window has reset. Read .severance/handover.md and continue the task from where it left off." Enter 2>/dev/null || true
+		local msg="Window has reset. Read .severance/handover.md and continue the task from where it left off."
+		# Send the text and Enter as SEPARATE keystrokes with a delay: a TUI like
+		# Claude Code treats fast-arriving text like a paste and a same-invocation
+		# trailing Enter as a newline, so the message is typed but never submitted.
+		# -l sends the text literally; the delayed, separate Enter actually submits.
+		"${SEV_TMUX[@]}" send-keys -t "$pane" -l "$msg" 2>/dev/null || true
+		sleep "${SEVERANCE_RESUME_ENTER_DELAY:-0.4}"
+		"${SEV_TMUX[@]}" send-keys -t "$pane" Enter 2>/dev/null || true
 		# shellcheck disable=SC2016
 		sev_state_merge "$sf" \
 			'. + {status:"active", paused:false, reason:null, preempted_by:null, resume_count:($rc|tonumber), resume_at:null, ts:($ts|tonumber)}' \
