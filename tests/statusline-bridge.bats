@@ -61,6 +61,15 @@ teardown() {
 	[[ "$output" == *"5h"* ]]
 }
 
+@test "bridge writes a per-session cost file (so the cost cap is per-session)" {
+	"$BRIDGE" <"$SEV_FIXTURES/signal/statusline-stdin.json" >/dev/null
+	f="$SEVERANCE_STATE_DIR/sessions/sess-abc123.json"
+	[ -f "$f" ]
+	jq -e '.session_id == "sess-abc123" and .cost.total_cost_usd == 1.42' "$f"
+	run check-jsonschema --schemafile "$SEV_ROOT/schemas/session-cost.schema.json" "$f"
+	[ "$status" -eq 0 ]
+}
+
 @test "bridge concurrent invocations keep usage.json valid JSON" {
 	for _ in $(seq 1 15); do
 		"$BRIDGE" <"$SEV_FIXTURES/signal/statusline-stdin.json" >/dev/null &

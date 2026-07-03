@@ -49,6 +49,16 @@ _stop() {
 	[ "$status" -eq 0 ]
 }
 
+@test "heartbeat: uses THIS session's cost when a per-session file exists (D6)" {
+	mkdir -p "$SEVERANCE_STATE_DIR/sessions"
+	jq -n '{ts:1, session_id:"s1", cost:{total_cost_usd:3.5}}' >"$SEVERANCE_STATE_DIR/sessions/s1.json"
+	_usage_cost 99.0 # the shared usage.json (a sibling) says $99
+	_stop
+	run "$HB" <"$SEV_TMP/in.json"
+	[ "$status" -eq 0 ]
+	jq -e '.session_cost_usd == 3.5' "$SF"
+}
+
 @test "heartbeat: preserves a severed status while updating cost" {
 	jq -n --arg cwd "$CWD" \
 		'{name:"proj", cwd:$cwd, status:"severed", reason:"session_util", priority:"normal", paused:false, resume_count:1}' \
