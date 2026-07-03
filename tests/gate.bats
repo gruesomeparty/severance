@@ -122,6 +122,33 @@ _hook() {
 	jq -e '.reason=="cost_limit" and .signal_tier=="ccusage"' "$SF"
 }
 
+_session_cost() { # write THIS session's (s1) per-session cost file
+	mkdir -p "$SEVERANCE_STATE_DIR/sessions"
+	jq -n --argjson c "$1" --argjson ts "$(date +%s)" \
+		'{ts:$ts, session_id:"s1", cost:{total_cost_usd:$c}}' \
+		>"$SEVERANCE_STATE_DIR/sessions/s1.json"
+}
+
+@test "D6: cost cap uses THIS session's cost, not a sibling's in shared usage.json" {
+	_usage 10 10 null 50.0 # usage.json (a sibling was last writer) says \$50
+	_session_cost 2.0      # but this session has only spent \$2
+	_hook Bash
+	SEVERANCE_LIMIT_USD=5 run "$GATE" <"$SEV_TMP/in.json"
+	[ "$status" -eq 0 ] # not severed: our \$2 < \$5 cap, despite usage.json's \$50
+	_session_cost 6.0   # now this session itself exceeds the cap
+	SEVERANCE_LIMIT_USD=5 run "$GATE" <"$SEV_TMP/in.json"
+	[ "$status" -eq 2 ]
+	jq -e '.reason=="cost_limit"' "$SF"
+}
+
+@test "limit_usd is refreshed on the no-trip path (display staleness fix)" {
+	_usage 10 10
+	_hook Bash
+	SEVERANCE_LIMIT_USD=7 run "$GATE" <"$SEV_TMP/in.json"
+	[ "$status" -eq 0 ]
+	jq -e '.limit_usd == 7' "$SF"
+}
+
 @test "R3: consecutive blocks increment blocked_count and escalate at 5" {
 	_usage 85 40
 	_hook Bash

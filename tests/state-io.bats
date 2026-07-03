@@ -41,6 +41,14 @@ teardown() {
 	[ "$(sev_project_state_file myproj)" = "$SEVERANCE_STATE_DIR/projects/myproj.json" ]
 }
 
+@test "sev_session_cost_file: lives under <state>/sessions/<session_id>.json" {
+	[ "$(sev_session_cost_file 9359d2c5-abc)" = "$SEVERANCE_STATE_DIR/sessions/9359d2c5-abc.json" ]
+}
+
+@test "sev_session_cost_file: sanitizes unsafe characters in the session id" {
+	[ "$(sev_session_cost_file 'a/b c')" = "$SEVERANCE_STATE_DIR/sessions/a-b-c.json" ]
+}
+
 @test "sev_state_merge: creates then merges without clobbering existing fields" {
 	sf="$SEVERANCE_STATE_DIR/projects/p.json"
 	sev_state_merge "$sf" '. + {name:$n, resume_count:1}' --arg n "p"
