@@ -22,8 +22,14 @@ sf="$(sev_project_state_file "$slug")"
 prio="$(sev_config_get SEVERANCE_PRIORITY normal)"
 
 usage_file="$(sev_state_dir)/usage.json"
-proj_cost="$(jq -r '.cost.total_cost_usd // empty' "$usage_file" 2>/dev/null || true)"
 signal_tier="$(jq -r '.signal_tier // empty' "$usage_file" 2>/dev/null || true)"
+# Per-session cost (D6): prefer THIS session's file over the shared usage.json.
+proj_cost=""
+if [ -n "$session_id" ]; then
+	scf="$(sev_session_cost_file "$session_id")"
+	[ -f "$scf" ] && proj_cost="$(jq -r '.cost.total_cost_usd // empty' "$scf" 2>/dev/null || true)"
+fi
+[ -n "$proj_cost" ] || proj_cost="$(jq -r '.cost.total_cost_usd // empty' "$usage_file" 2>/dev/null || true)"
 
 # shellcheck disable=SC2016  # $-names in the filter are jq variables (--arg), not shell
 sev_state_merge "$sf" '

@@ -58,7 +58,14 @@ signal_tier="$(_s '.signal_tier // "none"')"
 used_credits="$(_s '.normalized.extra_usage.used_credits // empty')"
 
 usage_file="$(sev_state_dir)/usage.json"
-proj_cost="$(jq -r '.cost.total_cost_usd // empty' "$usage_file" 2>/dev/null || true)"
+# Cost is per-session (D6): read THIS session's cost first; fall back to the
+# shared usage.json only when there is no per-session record (single-session case).
+proj_cost=""
+if [ -n "$session_id" ]; then
+	scf="$(sev_session_cost_file "$session_id")"
+	[ -f "$scf" ] && proj_cost="$(jq -r '.cost.total_cost_usd // empty' "$scf" 2>/dev/null || true)"
+fi
+[ -n "$proj_cost" ] || proj_cost="$(jq -r '.cost.total_cost_usd // empty' "$usage_file" 2>/dev/null || true)"
 
 # Tier-3 estimates gate conservatively: trip the cost cap at 60% of the ceiling.
 cost_thr="$limit_usd"
@@ -108,12 +115,13 @@ if [ "$trip" -eq 0 ]; then
     . + {
       name:$n, cwd:$cwd, priority:$p, status:"active", paused:false, reason:null, preempted_by:null,
       session_cost_usd:(if $cost=="" then null else ($cost|tonumber) end),
+      limit_usd:(if $limit=="" then null else ($limit|tonumber) end),
       signal_tier:(if $tier=="none" or $tier=="" then null else $tier end),
       session_id:(if $sid=="" then null else $sid end),
       blocked_count:0, ts:($ts|tonumber)
     }' \
 		--arg n "$slug" --arg cwd "$cwd" --arg p "$prio" --arg cost "${proj_cost:-}" \
-		--arg tier "$signal_tier" --arg sid "$session_id" --arg ts "$(sev_now)" || true
+		--arg limit "${limit_usd:-}" --arg tier "$signal_tier" --arg sid "$session_id" --arg ts "$(sev_now)" || true
 	exit 0
 fi
 
