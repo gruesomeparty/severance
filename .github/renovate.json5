@@ -1,0 +1,26 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: ['config:recommended', ':semanticCommits'],
+  schedule: ['before 6am on monday'],
+  labels: ['dependencies'],
+  packageRules: [
+    // Low-risk: auto-merge GitHub Action digest/patch bumps.
+    {
+      matchManagers: ['github-actions'],
+      matchUpdateTypes: ['digest', 'pin', 'patch'],
+      automerge: true,
+    },
+  ],
+  // Pin tools referenced by a "# renovate: datasource=… depName=…" comment
+  // followed by a *_VERSION=… line (e.g. shfmt in ci.yml). ccusage is invoked as
+  // `npx -y ccusage` (always latest) by design, so there is nothing to pin there.
+  customManagers: [
+    {
+      customType: 'regex',
+      managerFilePatterns: ['/^\\.github/workflows/.*\\.ya?ml$/'],
+      matchStrings: [
+        '# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s+[A-Z_]+_VERSION=(?<currentValue>\\S+)',
+      ],
+    },
+  ],
+}
