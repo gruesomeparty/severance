@@ -8,7 +8,9 @@
 .build/
 apps/menubar/.build/
 apps/menubar/.swiftpm/
+apps/menubar/*.app
 *.xcodeproj
+Severance-macos.zip
 
 # Python (local schema validation)
 .venv/
