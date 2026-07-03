@@ -1,0 +1,70 @@
+name: app-release
+
+# Fires when release-please tags a menu bar release (PRD §8.4).
+on:
+  push:
+    tags:
+      - "menubar-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-app:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Bundle Severance.app
+        working-directory: apps/menubar
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          SEVERANCE_APP_VERSION="${TAG#menubar-v}" bash scripts/bundle-app.sh
+
+      # Optional, secret-gated Developer ID codesign + notarize. Skipped entirely
+      # when the secrets are absent; the unsigned zip is the default artifact and
+      # INSTALL.md documents the Gatekeeper bypass.
+      - name: Codesign + notarize (if configured)
+        if: ${{ secrets.MACOS_CERT_P12 != '' }}
+        working-directory: apps/menubar
+        env:
+          CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          echo "$CERT_P12" | base64 --decode > cert.p12
+          security create-keychain -p ci build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p ci build.keychain
+          security import cert.p12 -k build.keychain -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ci build.keychain
+          IDENTITY="$(security find-identity -v -p codesigning build.keychain | awk 'NR==1{print $2}')"
+          codesign --force --deep --options runtime --sign "$IDENTITY" Severance.app
+          ditto -c -k --sequesterRsrc --keepParent Severance.app Severance-macos.zip
+          xcrun notarytool submit Severance-macos.zip \
+            --apple-id "$NOTARY_APPLE_ID" --team-id "$NOTARY_TEAM_ID" --password "$NOTARY_PASSWORD" --wait
+          xcrun stapler staple Severance.app
+          rm -f cert.p12
+
+      - name: Zip (unsigned default)
+        working-directory: apps/menubar
+        run: |
+          [ -f Severance-macos.zip ] || ditto -c -k --sequesterRsrc --keepParent Severance.app Severance-macos.zip
+
+      - name: Attach to the GitHub release
+        working-directory: apps/menubar
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: gh release upload "$TAG" Severance-macos.zip --clobber
+
+  # F2 follow-up: bump the Homebrew cask on each release. Scaffolded, disabled.
+  homebrew-bump:
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "scaffold - push cask version + sha256 to gruesomeparty/homebrew-tap"
