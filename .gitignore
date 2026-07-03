@@ -1,6 +1,9 @@
 # Severance handover + local runtime state — never committed
 .severance/
 
+# Local Claude Code settings (per-machine; e.g. Severance test caps)
+.claude/settings.local.json
+
 # macOS
 .DS_Store
 

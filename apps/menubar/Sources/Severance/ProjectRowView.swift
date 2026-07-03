@@ -38,11 +38,76 @@ struct ProjectRowView: View {
                     }
                 }
                 Text(meta).font(.mono(10)).foregroundStyle(palette.inkMute)
-                trailing
+                if let limit = project.limitUsd, limit > 0,
+                   project.status == .active || project.status == .paused {
+                    costBar(limit: limit)
+                }
+                actionLine
             }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 9)
+        .contextMenu {
+            if project.status == .active {
+                Button("Sever now") { store.severNow(project) }
+            } else {
+                Button("Resume now") { store.resumeNow(project) }
+            }
+            if project.status != .active {
+                Button("Open handover…") { store.openHandover(project) }
+            }
+        }
+    }
+
+    // MARK: action line (primary buttons)
+
+    @ViewBuilder private var actionLine: some View {
+        HStack(spacing: 8) {
+            switch project.status {
+            case .severed:
+                Text(resumeCountdown).font(.mono(10)).foregroundStyle(palette.amber)
+            case .paused:
+                Text(project.reason == .preempted ? "preempted" : "paused")
+                    .font(.mono(10)).foregroundStyle(palette.amber)
+            default:
+                EmptyView()
+            }
+            Spacer(minLength: 0)
+            if project.status == .active {
+                pill("Sever", tint: palette.severed) { store.severNow(project) }
+            } else {
+                pill(project.status == .severed ? "Resume now" : "Resume", tint: palette.accent) {
+                    store.resumeNow(project)
+                }
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    private func pill(_ title: String, tint: Color, _ action: @escaping () -> Void) -> some View {
+        Button(title, action: action)
+            .buttonStyle(.plain)
+            .font(.system(size: 10.5, weight: .semibold))
+            .foregroundStyle(tint)
+            .padding(.horizontal, 9).padding(.vertical, 3)
+            .background(RoundedRectangle(cornerRadius: 5).fill(tint.opacity(0.10)))
+            .overlay(RoundedRectangle(cornerRadius: 5).stroke(tint.opacity(0.5), lineWidth: 1))
+    }
+
+    private func costBar(limit: Double) -> some View {
+        let frac = min(1.0, (project.sessionCostUsd ?? 0) / limit)
+        let hot = project.status == .paused
+        return GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(palette.barBG)
+                Capsule().fill(hot ? palette.amber : palette.accentDim)
+                    .frame(width: geo.size.width * frac)
+                Rectangle().fill(palette.severed).frame(width: 1, height: 8)
+                    .position(x: geo.size.width, y: 4)
+            }
+        }
+        .frame(height: 3)
+        .padding(.top, 4)
     }
 
     // MARK: derived
@@ -68,7 +133,7 @@ struct ProjectRowView: View {
         switch project.status {
         case .active: return "Active"
         case .severed: return "Severed"
-        case .paused: return project.reason == .preempted ? "Paused" : "Paused"
+        case .paused: return "Paused"
         case .orphaned: return "Orphaned"
         }
     }
@@ -89,38 +154,6 @@ struct ProjectRowView: View {
             return "manually paused"
         case .orphaned:
             return "orphaned · original pane is gone"
-        }
-    }
-
-    // Cost bar for budgeted running projects; resume line for severed ones.
-    @ViewBuilder private var trailing: some View {
-        if project.status == .severed {
-            HStack {
-                Text(resumeCountdown).font(.mono(10)).foregroundStyle(palette.amber)
-                Spacer()
-                Button("Resume now") { store.resumeNow(project) }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 10.5, weight: .semibold))
-                    .foregroundStyle(palette.accent)
-                    .padding(.horizontal, 9).padding(.vertical, 3)
-                    .background(RoundedRectangle(cornerRadius: 5).fill(palette.accentBG))
-                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(palette.accentBorder, lineWidth: 1))
-            }
-            .padding(.top, 2)
-        } else if let limit = project.limitUsd, limit > 0 {
-            let frac = min(1.0, (project.sessionCostUsd ?? 0) / limit)
-            let hot = project.status == .paused
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(palette.barBG)
-                    Capsule().fill(hot ? palette.amber : palette.accentDim)
-                        .frame(width: geo.size.width * frac)
-                    Rectangle().fill(palette.severed).frame(width: 1, height: 8)
-                        .position(x: geo.size.width, y: 4)
-                }
-            }
-            .frame(height: 3)
-            .padding(.top, 4)
         }
     }
 
