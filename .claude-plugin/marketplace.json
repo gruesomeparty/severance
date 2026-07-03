@@ -1,0 +1,15 @@
+{
+  "name": "severance",
+  "owner": {
+    "name": "gruesomeparty",
+    "url": "https://github.com/gruesomeparty"
+  },
+  "plugins": [
+    {
+      "name": "severance",
+      "source": "./plugin",
+      "description": "Budget-enforcement + auto-resume gate for Claude Code side projects (innie budget), leaving work repos (outie budget) untouched.",
+      "license": "MIT"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "severance",
+  "version": "0.1.0",
+  "description": "Sever side-project Claude Code spend from work spend: gate opted-in projects on official utilization, have the agent write a handover, stop before usage-credit billing, and auto-resume in the original tmux pane at window reset.",
+  "author": {
+    "name": "gruesomeparty",
+    "url": "https://github.com/gruesomeparty"
+  },
+  "homepage": "https://github.com/gruesomeparty/severance",
+  "repository": "https://github.com/gruesomeparty/severance",
+  "license": "MIT",
+  "keywords": [
+    "budget",
+    "usage-limits",
+    "rate-limits",
+    "tmux",
+    "auto-resume",
+    "statusline",
+    "severance"
+  ]
+}
