@@ -11,12 +11,94 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    outputs:
+      menubar_released: ${{ steps.rp.outputs['apps/menubar--release_created'] }}
+      menubar_tag: ${{ steps.rp.outputs['apps/menubar--tag_name'] }}
     steps:
-      # Manifest mode with two components: plugin (tags plugin-vX.Y.Z, bumps
-      # plugin.json) and menubar (tags menubar-vX.Y.Z; app-release.yml then builds
-      # + attaches the zip). PRD §8.3.
+      # Manifest mode, two components: plugin (tags plugin-vX.Y.Z, bumps plugin.json)
+      # and menubar (tags menubar-vX.Y.Z; the release-app job below builds it). §8.3.
       - uses: googleapis/release-please-action@v5
+        id: rp
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+  # Build + attach the app and bump the Homebrew cask when a menubar release is cut.
+  # This runs in the SAME workflow run as the release (triggered by the normal push
+  # to main), which avoids the "tags created by GITHUB_TOKEN don't trigger other
+  # workflows" gotcha that left the old tag-triggered app-release.yml dead.
+  release-app:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.menubar_released == 'true' }}
+    runs-on: macos-14
+    permissions:
+      contents: write
+    env:
+      TAG: ${{ needs.release-please.outputs.menubar_tag }}
+      HAS_SIGNING: ${{ secrets.MACOS_CERT_P12 != '' }}
+      HAS_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-please.outputs.menubar_tag }}
+
+      - name: Bundle Severance.app
+        working-directory: apps/menubar
+        run: SEVERANCE_APP_VERSION="${TAG#menubar-v}" bash scripts/bundle-app.sh
+
+      # Optional, secret-gated Developer ID codesign + notarize. Skipped entirely
+      # when the secrets are absent; the unsigned zip is the default artifact.
+      - name: Codesign + notarize (if configured)
+        if: ${{ env.HAS_SIGNING == 'true' }}
+        working-directory: apps/menubar
+        env:
+          CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          NOTARY_APPLE_ID: ${{ secrets.NOTARY_APPLE_ID }}
+          NOTARY_TEAM_ID: ${{ secrets.NOTARY_TEAM_ID }}
+          NOTARY_PASSWORD: ${{ secrets.NOTARY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          echo "$CERT_P12" | base64 --decode >cert.p12
+          security create-keychain -p ci build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p ci build.keychain
+          security import cert.p12 -k build.keychain -P "$CERT_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k ci build.keychain
+          IDENTITY="$(security find-identity -v -p codesigning build.keychain | awk 'NR==1{print $2}')"
+          codesign --force --deep --options runtime --sign "$IDENTITY" Severance.app
+          ditto -c -k --sequesterRsrc --keepParent Severance.app Severance-macos.zip
+          xcrun notarytool submit Severance-macos.zip \
+            --apple-id "$NOTARY_APPLE_ID" --team-id "$NOTARY_TEAM_ID" --password "$NOTARY_PASSWORD" --wait
+          xcrun stapler staple Severance.app
+
+      - name: Zip (unsigned default)
+        working-directory: apps/menubar
+        run: |
+          [ -f Severance-macos.zip ] || ditto -c -k --sequesterRsrc --keepParent Severance.app Severance-macos.zip
+
+      - name: Attach the zip to the release
+        working-directory: apps/menubar
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" Severance-macos.zip --clobber
+
+      # Bump gruesomeparty/homebrew-tap. Needs a PAT (GITHUB_TOKEN can't push
+      # cross-repo); no-ops when HOMEBREW_TAP_TOKEN is absent. F2.
+      - name: Bump the Homebrew cask (if configured)
+        if: ${{ env.HAS_TAP_TOKEN == 'true' }}
+        working-directory: apps/menubar
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          set -euo pipefail
+          version="${TAG#menubar-v}"
+          sha="$(shasum -a 256 Severance-macos.zip | awk '{print $1}')"
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/gruesomeparty/homebrew-tap.git" tap
+          cask="tap/Casks/severance.rb"
+          sed -i '' -E "s/^  version \"[^\"]*\"/  version \"${version}\"/" "$cask"
+          sed -i '' -E "s/^  sha256 \"[^\"]*\"/  sha256 \"${sha}\"/" "$cask"
+          git -C tap -c user.name="severance-release" -c user.email="noreply@github.com" \
+            commit -aqm "feat: severance ${version}"
+          git -C tap push origin HEAD:main
