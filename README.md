@@ -2,87 +2,98 @@
 
 **Sever your side-project Claude Code spend from your work spend on a shared Team plan.**
 
-> Your **outie** works unbudgeted — long sessions on the org's dime, allowed to
-> roll into usage credits. Your **innie** gets a hard allowance and a scheduled
-> return to the severed floor.
+> Your **outie** works unbudgeted — long sessions on the org's dime.
+> Your **innie** gets a hard allowance and a scheduled return to the severed floor.
 
-Severance is two deliverables in one repo:
+Severance hard-caps opted-in ("severed") projects on Anthropic's *official*
+utilization accounting, has the agent write a handover, stops the session before it
+can roll into usage-credit billing, and auto-resumes it in its original tmux pane
+when the window resets. A macOS menu bar app shows the gauges and drives resume.
 
-1. A **Claude Code plugin** — hooks + a statusline bridge + scripts that gate
-   opted-in ("severed") projects on Anthropic's *official* utilization
-   accounting, instruct the agent to write a handover, stop the session before
-   it can trigger usage-credit billing, and auto-resume it in its original tmux
-   pane when the usage window resets.
-2. A **macOS menu bar app** (`Severance.app`) — a read-only dashboard over the
-   shared state directory, plus the macOS resume scheduler.
+## Features
 
-## Why
+- **Gates on official `rate_limits`** (5h / 7d utilization), not local token guesses,
+  so it keeps working when limits or model weighting change. Falls back to the OAuth
+  usage endpoint, then a local `ccusage` estimate — and records which tier it used.
+- **Per-project, per-priority budgets** via a priority ladder (critical / high /
+  normal / low). Work repos are untouched — installing the plugin is a no-op until a
+  repo opts in.
+- **Zero-friction resume** — the agent writes its own handover; the session is
+  re-injected into its tmux pane at reset (systemd on Linux, the menu bar app on macOS).
+- **Preemption** — a high-priority session defends headroom by pausing lower-priority ones.
+- **Cost caps** — an optional absolute per-session USD cap, plus a hard trip the moment
+  usage credits start burning.
+- **macOS menu bar app** — 5h / 7d gauges, per-project status, and Sever / Resume /
+  Open-handover actions.
+- **All state is plain JSON** under `~/.claude/severance/` — `cat` it, or watch it in the app.
 
-On a Team plan, work sessions may roll into organization usage credits (extra
-billing) — fine for your outie. Side projects shouldn't. Severance gates severed
-projects on Anthropic's own `rate_limits` accounting, so the gate keeps working
-even when limits or model weightings change; it hard-stops them before the plan
-limit; and it brings them back automatically at reset — "returning to the
-severed floor."
+## Install
 
-Opt-in is explicit and per-project (`SEVERANCE_ENABLED=1` in a repo's
-`.claude/settings.json`), so installing the plugin org-wide leaves work repos
-untouched. All state is plain JSON under one directory; the menu bar app (or
-`cat`) is just a reader.
-
-## Quickstart (plugin)
+**Plugin** (Linux + macOS):
 
 ```text
 /plugin marketplace add gruesomeparty/severance
 /plugin install severance@severance
 ```
 
-Then, in a side project you want gated, add to `.claude/settings.json`:
+**Menu bar app** (macOS 14+):
+
+```sh
+brew install --cask gruesomeparty/tap/severance   # ad-hoc signed: add --no-quarantine
+```
+
+Or grab `Severance-macos.zip` from [Releases](https://github.com/gruesomeparty/severance/releases)
+(`xattr -dr com.apple.quarantine Severance.app && open Severance.app`), or build from
+source: `cd apps/menubar && bash scripts/bundle-app.sh`.
+
+## Configure
+
+Ask Claude *"set up severance for this repo"* (the bundled `configuring-severance`
+skill does it), or by hand in a project's `.claude/settings.json`:
 
 ```json
 { "env": { "SEVERANCE_ENABLED": "1", "SEVERANCE_PRIORITY": "normal" } }
 ```
 
-and point your statusline at the bridge (see [docs/INSTALL.md](docs/INSTALL.md)).
-The bundled `configuring-severance` skill automates all of this — just ask Claude
-to *"set up severance for this repo."*
+Then wire the statusline bridge for the best (Tier-1) signal — see
+[docs/INSTALL.md](docs/INSTALL.md) — and add `.severance/` to `.gitignore`.
 
-## Menu bar app (macOS)
+Common knobs (project `env`): `SEVERANCE_PRIORITY` (critical/high/normal/low),
+`SEVERANCE_LIMIT_USD` (per-session cost cap), `SEVERANCE_UTIL_PCT` /
+`SEVERANCE_WEEKLY_PCT` (override the ladder), `SEVERANCE_MAX_RESUMES`. Full list and
+the ladder defaults: [docs/](docs/).
 
-`Severance.app` shows the 5h / 7d refinement-quota gauges, per-project status,
-and drives resume on macOS. Build and install steps live in
-[docs/INSTALL.md](docs/INSTALL.md).
+## Use
 
-## Honesty box
+- `/severance:severance-status` — live signal tier, 5h / 7d utilization, and per-project state.
+- **Menu bar app** — click the icon for the gauges and project rows; Sever / Resume /
+  Open-handover per project; a Launch-at-login toggle.
+- When a project trips, the agent writes `.severance/handover.md` and stops; it resumes
+  automatically at the window reset (or hit **Resume now**).
 
-- **Tier 1** — official `rate_limits` via the statusline — is authoritative but
-  requires a recent Claude Code and a Pro/Max login.
-- **Tier 2** — the OAuth usage endpoint — is **undocumented and may be
-  restricted or removed** at any time. Severance treats every failure as
-  expected and degrades silently to Tier 3.
-- **Tier 3** — `ccusage` — is a **local estimate**. When it's the only signal
-  the gate is deliberately conservative and the state records
-  `signal_tier: ccusage` (shown as an *estimate* provenance badge).
+## Signals — the honest version
 
-Full tier design and caveats: [docs/SIGNALS.md](docs/SIGNALS.md).
+- **Tier 1** — official `rate_limits` via the statusline. Best; needs a recent Claude
+  Code and a Pro/Max login.
+- **Tier 2** — the OAuth usage endpoint. **Undocumented; may be restricted or removed.**
+  Degrades silently.
+- **Tier 3** — `ccusage`. A local estimate; the gate stays conservative and marks state
+  `signal_tier: ccusage`.
 
-## Status
+Details and verification commands: [docs/SIGNALS.md](docs/SIGNALS.md).
 
-Built milestone by milestone ([`severance-prd.md`](severance-prd.md) §16):
+## Roadmap
 
-- [x] **M1** — skeleton, JSON-Schema contracts, fixtures, CI (lint + schema)
-- [x] **M2** — signal layer (lib, statusline bridge, OAuth fallback, `ccusage`)
-- [x] **M3** — gate + resume (preemption, tmux auto-resume, `/severance:severance-status`)
-- [x] **M4** — plugin packaging + skills (`claude plugin validate --strict` clean)
-- [x] **M5** — macOS menu bar app (`MenuBarExtra`, resume scheduler)
-- [x] **M6** — release hardening (release-please, CodeQL, Renovate, compat canary)
+- [ ] Burn-rate / pace-aware shedding (shed faster burners before slow ones)
+- [ ] Linux desktop notifications on sever / resume
+- [ ] Per-session state for concurrent same-repo sessions
+      ([#15](https://github.com/gruesomeparty/severance/issues/15))
 
-First `plugin-v*` / `menubar-v*` releases are cut by merging the release-please PR.
+## Contributing
 
-The PRD is the binding spec. [`docs/`](docs/) holds
-[architecture](docs/ARCHITECTURE.md), [signals](docs/SIGNALS.md),
-[install](docs/INSTALL.md), [upstream doc snapshots](docs/upstream-snapshots/),
-and [deviations](docs/DEVIATIONS.md).
+Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). Architecture and
+internals live in [docs/](docs/) ([architecture](docs/ARCHITECTURE.md) ·
+[signals](docs/SIGNALS.md) · [install](docs/INSTALL.md)).
 
 ## License
 
