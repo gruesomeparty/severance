@@ -1,0 +1,25 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "separate-pull-requests": true,
+  "packages": {
+    "plugin": {
+      "release-type": "simple",
+      "component": "plugin",
+      "include-component-in-tag": true,
+      "tag-separator": "-",
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "plugin/.claude-plugin/plugin.json",
+          "jsonpath": "$.version"
+        }
+      ]
+    },
+    "apps/menubar": {
+      "release-type": "simple",
+      "component": "menubar",
+      "include-component-in-tag": true,
+      "tag-separator": "-"
+    }
+  }
+}

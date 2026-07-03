@@ -1,0 +1,22 @@
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      # Manifest mode with two components: plugin (tags plugin-vX.Y.Z, bumps
+      # plugin.json) and menubar (tags menubar-vX.Y.Z; app-release.yml then builds
+      # + attaches the zip). PRD §8.3.
+      - uses: googleapis/release-please-action@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
