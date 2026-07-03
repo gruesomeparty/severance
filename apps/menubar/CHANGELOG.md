@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/gruesomeparty/severance/compare/menubar-v1.1.0...menubar-v1.1.1) (2026-07-03)
+
+
+### Bug Fixes
+
+* **app:** locate installed resume.sh and give child scripts tmux/PATH ([e66b25f](https://github.com/gruesomeparty/severance/commit/e66b25ff150e77348f9aa202966ed5760c335ee1))
+
 ## [1.1.0](https://github.com/gruesomeparty/severance/compare/menubar-v1.0.0...menubar-v1.1.0) (2026-07-03)
 
 
