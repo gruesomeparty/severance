@@ -36,7 +36,7 @@ jobs:
       - name: Lint shell scripts
         run: |
           set -euo pipefail
-          mapfile -t files < <(find plugin/scripts tests -type f -name '*.sh' 2>/dev/null | sort)
+          mapfile -t files < <(find plugin/scripts tests apps/menubar/scripts -type f -name '*.sh' 2>/dev/null | sort)
           if [[ ${#files[@]} -eq 0 ]]; then
             echo "no shell scripts to lint"
             exit 0
@@ -110,3 +110,23 @@ jobs:
         run: npm install -g @anthropic-ai/claude-code
       - name: claude plugin validate --strict
         run: claude plugin validate ./plugin --strict
+
+  # Menu bar app (PRD §8.1 test-app): build + test on macOS, bundle, upload the zip.
+  test-app:
+    runs-on: macos-14
+    defaults:
+      run:
+        working-directory: apps/menubar
+    steps:
+      - uses: actions/checkout@v4
+      - name: swift test
+        run: swift test
+      - name: Bundle Severance.app
+        run: bash scripts/bundle-app.sh
+      - name: Zip the app
+        run: ditto -c -k --sequesterRsrc --keepParent Severance.app Severance-macos.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Severance-macos
+          path: apps/menubar/Severance-macos.zip
+          if-no-files-found: error
