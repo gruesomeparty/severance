@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/gruesomeparty/severance/compare/menubar-v1.0.0...menubar-v1.1.0) (2026-07-03)
+
+
+### Features
+
+* **app:** add app icon, menu bar glyph, Quit, and Launch-at-login ([4cf0d77](https://github.com/gruesomeparty/severance/commit/4cf0d774baf6d0f47e1f9e16ca71b52441b4d022))
+* **app:** manual Sever / Resume / Open handover from the panel ([8b1c2ce](https://github.com/gruesomeparty/severance/commit/8b1c2ceaf4e8246054ba38d07f7ca444e1efac3b))
+
 ## 1.0.0 (2026-07-03)
 
 
