@@ -2,7 +2,6 @@
 description: Print the current Severance budget-gate status — signal tier, 5h/7d refinement quotas, and per-project sever/resume state. Use when the user asks about severance status, budget usage, or which projects are severed/paused.
 argument-hint: ""
 allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/scripts/severance-status.sh)
-disable-model-invocation: true
 ---
 
 Current Severance state:
