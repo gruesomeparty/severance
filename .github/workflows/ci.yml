@@ -64,8 +64,8 @@ jobs:
           check-jsonschema --version
       - name: Validate schemas + fixtures
         run: bash tests/validate-schemas.sh
-      # TODO(M4): validate plugin/.claude-plugin/plugin.json,
-      # .claude-plugin/marketplace.json and plugin/hooks/hooks.json here.
+      - name: Validate plugin manifests (vendored schemas)
+        run: bash tests/validate-manifests.sh
 
   # Skill frontmatter gate (PRD §8.1). No-op until skills land in M4.
   skill-lint:
@@ -95,3 +95,18 @@ jobs:
           bats --version && jq --version && python3 --version && check-jsonschema --version
       - name: Run bats suite
         run: bats --print-output-on-failure tests/
+
+  # Best-effort manifest smoke via the real CLI (PRD §9.7). Non-blocking: the
+  # authoritative-but-offline check is validate-json's vendored-schema step.
+  plugin-validate:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+      - name: claude plugin validate --strict
+        run: claude plugin validate ./plugin --strict
