@@ -71,14 +71,18 @@ Full tier design and caveats: [docs/SIGNALS.md](docs/SIGNALS.md).
 Built milestone by milestone ([`severance-prd.md`](severance-prd.md) §16):
 
 - [x] **M1** — skeleton, JSON-Schema contracts, fixtures, CI (lint + schema)
-- [ ] M2 — signal layer (lib, statusline bridge, OAuth fallback, `ccusage`)
-- [ ] M3 — gate + resume
-- [ ] M4 — plugin packaging + skills
-- [ ] M5 — menu bar app
-- [ ] M6 — release hardening (release-please, CodeQL, Renovate, compat canary)
+- [x] **M2** — signal layer (lib, statusline bridge, OAuth fallback, `ccusage`)
+- [x] **M3** — gate + resume (preemption, tmux auto-resume, `/severance:severance-status`)
+- [x] **M4** — plugin packaging + skills (`claude plugin validate --strict` clean)
+- [x] **M5** — macOS menu bar app (`MenuBarExtra`, resume scheduler)
+- [x] **M6** — release hardening (release-please, CodeQL, Renovate, compat canary)
 
-The PRD is the binding spec. [`docs/`](docs/) holds architecture, signals,
-install, upstream doc snapshots, and [deviations](docs/DEVIATIONS.md).
+First `plugin-v*` / `menubar-v*` releases are cut by merging the release-please PR.
+
+The PRD is the binding spec. [`docs/`](docs/) holds
+[architecture](docs/ARCHITECTURE.md), [signals](docs/SIGNALS.md),
+[install](docs/INSTALL.md), [upstream doc snapshots](docs/upstream-snapshots/),
+and [deviations](docs/DEVIATIONS.md).
 
 ## License
 
