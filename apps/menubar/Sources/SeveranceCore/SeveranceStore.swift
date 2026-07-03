@@ -144,7 +144,20 @@ public final class SeveranceStore: ObservableObject {
         refresh()
     }
 
-    public func resumeNow(_ project: ProjectState) { runResume(projectName: project.name) }
+    public func resumeNow(_ project: ProjectState) {
+        // A severed project with a live pane gets the tmux continuation via resume.sh;
+        // a manual/preempted pause (usually no pane) just has its flag cleared.
+        if let pane = project.tmuxPane, !pane.isEmpty {
+            runResume(projectName: project.name)
+        } else {
+            mergeState(project.name, [
+                "status": "active", "paused": false, "reason": NSNull(),
+                "preempted_by": NSNull(), "resume_at": NSNull(),
+                "ts": Int(Date().timeIntervalSince1970),
+            ])
+            refresh()
+        }
+    }
 
     private func runResume(projectName: String) {
         let sf = stateDir.appendingPathComponent("projects/\(projectName).json")
