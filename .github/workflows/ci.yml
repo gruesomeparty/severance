@@ -89,7 +89,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends bats
+          sudo apt-get install -y --no-install-recommends bats tmux
           python -m pip install --upgrade pip
           python -m pip install check-jsonschema==0.37.4
           bats --version && jq --version && python3 --version && check-jsonschema --version
