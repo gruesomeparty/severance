@@ -2,6 +2,11 @@
 
 **Sever your side-project Claude Code spend from your work spend on a shared Team plan.**
 
+<p align="center">
+  <img src="docs/media/example.png" width="380"
+       alt="Severance menu bar panel — 5h/7d refinement quotas and per-project sever/resume/handover">
+</p>
+
 > Your **outie** works unbudgeted — long sessions on the org's dime.
 > Your **innie** gets a hard allowance and a scheduled return to the severed floor.
 
