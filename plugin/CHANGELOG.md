@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.1](https://github.com/gruesomeparty/severance/compare/plugin-v1.0.0...plugin-v1.0.1) (2026-07-03)
+
+
+### Bug Fixes
+
+* **commands:** let Claude invoke /severance:severance-status ([6172f52](https://github.com/gruesomeparty/severance/commit/6172f5266567a148b087cc9ac7fe8a9d161268e8))
+* **scripts:** cost cap reads THIS session's cost, not a sibling's (D6) ([7e89129](https://github.com/gruesomeparty/severance/commit/7e8912987ebe520883a2fc88b1b9bc245af1d97e))
+* **scripts:** resume submits the prompt (separate delayed Enter) ([f6d7c71](https://github.com/gruesomeparty/severance/commit/f6d7c71279af31183211019090ad03def56266a1))
+
 ## 1.0.0 (2026-07-03)
 
 
