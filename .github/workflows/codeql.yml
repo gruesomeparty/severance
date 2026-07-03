@@ -1,0 +1,43 @@
+name: codeql
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "27 3 * * 1"
+
+jobs:
+  analyze:
+    name: analyze (${{ matrix.language }})
+    # Code scanning is free on public repos; skip on private until the rename (D4).
+    if: github.event.repository.visibility == 'public'
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: swift
+            runner: macos-14
+            build-mode: manual
+          - language: actions
+            runner: ubuntu-latest
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+      - name: Build (Swift manual build-mode)
+        if: matrix.language == 'swift'
+        working-directory: apps/menubar
+        run: swift build
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: "/language:${{ matrix.language }}"
