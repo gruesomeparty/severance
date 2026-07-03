@@ -121,6 +121,115 @@ sev_locked() {
 	return "$rc"
 }
 
+# ---- ladder & project state -------------------------------------------------
+
+# sev_ladder <priority> <session|weekly|reserve> — print the threshold for a
+# priority band. Reads config.json .ladder first (an explicit null there means
+# "gate off"), else the built-in defaults (PRD §5.4). Prints the literal "null"
+# when the gate is disabled.
+sev_ladder() {
+	local prio="$1" field="$2" cfg val
+	cfg="$(sev_state_dir)/config.json"
+	if [ -f "$cfg" ]; then
+		val="$(jq -r --arg p "$prio" --arg f "$field" '
+        if ((.ladder[$p] // {}) | has($f))
+        then (.ladder[$p][$f] | if . == null then "null" else tostring end)
+        else "MISSING" end' "$cfg" 2>/dev/null || echo MISSING)"
+		if [ "$val" != "MISSING" ]; then
+			printf '%s\n' "$val"
+			return 0
+		fi
+	fi
+	case "$prio:$field" in
+	high:session) echo 85 ;;
+	high:weekly) echo 95 ;;
+	high:reserve) echo 60 ;;
+	normal:session) echo 70 ;;
+	normal:weekly) echo 85 ;;
+	low:session) echo 50 ;;
+	low:weekly) echo 70 ;;
+	*) echo null ;; # critical:* and *:reserve default to off
+	esac
+}
+
+# sev_project_state_file <slug> — path to a project's state JSON.
+sev_project_state_file() {
+	printf '%s\n' "$(sev_state_dir)/projects/$1.json"
+}
+
+# _sev_merge_rmw <statefile> <jq_filter> [jq_args...] — read-modify-write body,
+# always run under sev_state_merge's lock. Resets an unparseable file to {}.
+_sev_merge_rmw() {
+	local sf="$1" filter="$2" existing
+	shift 2
+	existing="$(cat "$sf" 2>/dev/null || true)"
+	printf '%s' "$existing" | jq -e . >/dev/null 2>&1 || existing="{}"
+	printf '%s' "$existing" | jq "$@" "$filter" | sev_atomic_write "$sf"
+}
+
+# sev_state_merge <statefile> <jq_filter> [jq_args...] — atomically merge a jq
+# transform into a project state file, serialized by a per-file lock so
+# concurrent gates/heartbeats/preemption sweeps never lose updates.
+sev_state_merge() {
+	local sf="$1"
+	mkdir -p "$(dirname "$sf")"
+	sev_locked "$sf.lock" _sev_merge_rmw "$@"
+}
+
+# _sev_prio_rank <priority> — numeric rank for comparison (higher = more important).
+_sev_prio_rank() {
+	case "$1" in
+	critical) echo 3 ;;
+	high) echo 2 ;;
+	normal) echo 1 ;;
+	low) echo 0 ;;
+	*) echo 1 ;;
+	esac
+}
+
+# sev_preempt_sweep <slug> <priority> <session_util> — headroom preemption (§5.5).
+# When this project's band reserves headroom (non-null reserve) and session
+# utilization is at/above it, pause every ENABLED, strictly-LOWER-priority project
+# (a state file implies it was enabled) that is not already severed/orphaned.
+# Throttled to once per 60s per preemptor via preempt_sweep_ts (R5).
+sev_preempt_sweep() {
+	local slug="$1" prio="$2" util="$3"
+	local reserve
+	reserve="$(sev_ladder "$prio" reserve)"
+	[ "$reserve" != "null" ] && [ -n "$reserve" ] || return 0
+	[ -n "$util" ] || return 0
+	awk -v a="$util" -v b="$reserve" 'BEGIN{exit !(a + 0 >= b + 0)}' || return 0
+
+	local state_dir sf now last myrank
+	state_dir="$(sev_state_dir)"
+	sf="$(sev_project_state_file "$slug")"
+	now="$(sev_now)"
+
+	last="$(jq -r '.preempt_sweep_ts // 0' "$sf" 2>/dev/null || echo 0)"
+	if [ "$last" != "0" ] && [ "$last" != "null" ] && [ $((now - last)) -lt 60 ]; then
+		return 0
+	fi
+	# shellcheck disable=SC2016
+	sev_state_merge "$sf" '. + {preempt_sweep_ts:($t|tonumber)}' --arg t "$now" || true
+
+	myrank="$(_sev_prio_rank "$prio")"
+	local f other_slug other_prio other_status
+	for f in "$state_dir"/projects/*.json; do
+		[ -e "$f" ] || continue
+		other_slug="$(basename "$f" .json)"
+		[ "$other_slug" = "$slug" ] && continue
+		other_prio="$(jq -r '.priority // "normal"' "$f" 2>/dev/null || echo normal)"
+		other_status="$(jq -r '.status // "active"' "$f" 2>/dev/null || echo active)"
+		case "$other_status" in severed | orphaned) continue ;; esac
+		[ "$(_sev_prio_rank "$other_prio")" -lt "$myrank" ] || continue
+		# shellcheck disable=SC2016
+		sev_state_merge "$f" \
+			'. + {paused:true, reason:"preempted", preempted_by:$by, status:"paused", ts:($t|tonumber)}' \
+			--arg by "$slug" --arg t "$now" || true
+	done
+	return 0
+}
+
 # ---- tier acquisition -------------------------------------------------------
 
 # sev_ccusage — emit ccusage's active-block JSON, or fail. Honors
