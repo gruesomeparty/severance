@@ -107,3 +107,31 @@ intent on both platforms.
 
 **Evidence:** `command -v flock` → missing on macOS 15.
 
+---
+
+## D6 — cost is per-session; utilization is account-global
+
+**PRD implies:** a per-session cost cap (`SEVERANCE_LIMIT_USD`), with cost read from
+the single shared `usage.json`.
+
+**Reality (found by running two Claude Code sessions in one repo):** `usage.json`
+is keyed by repo, not session, and every session's statusline bridge overwrites it
+(last-writer-wins). Reading `cost.total_cost_usd` from it means one session's cap
+could be tripped by a **sibling session's** spend. Utilization (`rate_limits`) is
+account-global and *correct* to share; **cost is per-session** and was not.
+
+**Resolution:** the statusline bridge additionally writes
+`~/.claude/severance/sessions/<session_id>.json` (schema
+`schemas/session-cost.schema.json`); `gate.sh` and `heartbeat.sh` read **this**
+session's cost from there (falling back to `usage.json` for the single-session
+case). Utilization stays shared. The remaining collision — concurrent same-repo
+sessions clobbering one `projects/<slug>.json` (status/tmux_pane/resume_at) — is
+tracked as a follow-up in GitHub issue #15.
+
+**Also fixed alongside:** `gate.sh` now writes `limit_usd` on the no-trip path, so
+`severance-status` no longer shows a stale cap after `SEVERANCE_LIMIT_USD` changes.
+
+**Evidence:** a session whose own cost trajectory was `$2.31 → $2.97` was severed
+citing `$46.30` — the value in `usage.json` only while the *other* session was the
+last writer.
+
