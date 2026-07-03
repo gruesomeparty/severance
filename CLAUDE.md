@@ -61,7 +61,7 @@ while the Tier-1 cache is fresh. Plugin scripts reference `${CLAUDE_PLUGIN_ROOT}
 | `tests/` | bats suite, fixtures, and the `validate-schemas` / `lint-skills` helpers |
 | `apps/menubar/` | `Severance.app` SwiftPM package (M5) |
 | `docs/` | ARCHITECTURE, INSTALL, SIGNALS, DEVIATIONS, `upstream-snapshots/` |
-| `.github/workflows/` | CI, CodeQL, release-please, app-release, compat canary |
+| `.github/workflows/` | CI, CodeQL, release-please (builds + attaches the app + bumps the cask), commitlint, compat canary |
 
 ## The shared state contract (`~/.claude/severance/`)
 
