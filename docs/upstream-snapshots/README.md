@@ -25,13 +25,16 @@ baseline to diff against.
 | [`plugins-reference.md`](plugins-reference.md) | `plugins-reference.md` | `plugin.json` manifest fields, `claude plugin validate --strict` |
 | [`plugin-marketplaces.md`](plugin-marketplaces.md) | `plugin-marketplaces.md` | `marketplace.json`, `plugins[].source`, add/install commands |
 
-## Not yet snapshotted (verified at their milestone)
+| [`ccusage.md`](ccusage.md) | `ccusage blocks --json` | Tier-3 estimate: `costUSD`/`totalTokens` |
+| [`release-tooling.md`](release-tooling.md) | GitHub API | M6: release-please v5, codeql-action v4, Renovate |
 
-Milestone-local verification — captured when the code that consumes them lands:
+## Raw baselines (`raw/`)
 
-- **M6:** release-please manifest-mode config, CodeQL Swift default-setup, Renovate
-  schema (`renovate.json5`). These are external to Claude Code and change
-  independently; verifying them against current docs at M6 avoids stale captures.
+`raw/{hooks,statusline,plugins-reference,plugin-marketplaces}.md` are verbatim
+copies of the upstream pages. The weekly `compat.yml` canary re-fetches each page
+and diffs it against these; on any change it opens an issue pointing at the
+`severance-compat-check` skill (which updates the shapes **and** refreshes these
+baselines in the same PR).
 
 ## How to refresh
 
