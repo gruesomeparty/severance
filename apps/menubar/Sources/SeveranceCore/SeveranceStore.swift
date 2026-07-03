@@ -180,7 +180,9 @@ public final class SeveranceStore: ObservableObject {
 
     // MARK: helpers
 
-    // Locate a plugin script: explicit override, then the plugin cache.
+    // Locate a plugin script: explicit override, then the plugin cache. The
+    // installed layout is …/plugins/cache/<market>/severance/<version>/scripts/<name>,
+    // so match any severance path ending in /scripts/<name> and prefer the newest.
     private func scriptPath(_ name: String) -> String? {
         let fm = FileManager.default
         if let dir = ProcessInfo.processInfo.environment["SEVERANCE_SCRIPTS_DIR"] {
@@ -188,17 +190,36 @@ public final class SeveranceStore: ObservableObject {
             if fm.isExecutableFile(atPath: p) { return p }
         }
         let plugins = fm.homeDirectoryForCurrentUser.appendingPathComponent(".claude/plugins")
-        if let hit = try? fm.subpathsOfDirectory(atPath: plugins.path)
-            .first(where: { $0.hasSuffix("severance/plugin/scripts/\(name)") || $0.hasSuffix("severance/scripts/\(name)") }) {
-            return plugins.appendingPathComponent(hit).path
+        guard let subs = try? fm.subpathsOfDirectory(atPath: plugins.path) else { return nil }
+        let hit = subs
+            .filter { $0.hasSuffix("/scripts/\(name)") && $0.contains("severance") }
+            .sorted() // ascending → newest version last
+            .last
+        return hit.map { plugins.appendingPathComponent($0).path }
+    }
+
+    // A GUI-launched app inherits a minimal PATH (no /opt/homebrew/bin), so tmux/jq
+    // won't resolve. Give child scripts a usable PATH and point resume.sh's tmux at
+    // an absolute path so `send-keys` can actually reach the session's pane.
+    nonisolated static func childEnvironment() -> [String: String] {
+        var env = ProcessInfo.processInfo.environment
+        let extra = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+        env["PATH"] = env["PATH"].map { "\(extra):\($0)" } ?? extra
+        if env["SEVERANCE_TMUX"] == nil {
+            for t in ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux"]
+            where FileManager.default.isExecutableFile(atPath: t) {
+                env["SEVERANCE_TMUX"] = t
+                break
+            }
         }
-        return nil
+        return env
     }
 
     private func runDetached(_ launchPath: String, _ args: [String]) {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: launchPath)
         p.arguments = args
+        p.environment = Self.childEnvironment()
         try? p.run()
     }
 
@@ -253,6 +274,7 @@ public final class SeveranceStore: ObservableObject {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: launchPath)
         p.arguments = args
+        p.environment = childEnvironment()
         let pipe = Pipe()
         p.standardOutput = pipe
         p.standardError = FileHandle.nullDevice
