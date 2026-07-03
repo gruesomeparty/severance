@@ -48,15 +48,24 @@ struct MenuBarLabel: View {
     private let crit = 85.0
 
     var body: some View {
-        Text(text).foregroundStyle(tint)
+        HStack(spacing: 3) {
+            Image(systemName: symbol)
+            Text(text)
+        }
+        .foregroundStyle(tint)
     }
 
     private var util: Double? { store.usage?.normalized.session.utilization }
 
+    // Split-circle glyph (the "sever"); a note during the music dance experience.
+    private var symbol: String {
+        store.musicDanceExperience ? "music.note" : "circle.lefthalf.filled"
+    }
+
     private var text: String {
-        if store.musicDanceExperience { return "◦ 5h ♪" }
-        guard let u = util else { return "◦ severance" }
-        return "◦ 5h \(Int(u.rounded()))%"
+        if store.musicDanceExperience { return "5h" }
+        guard let u = util else { return "severance" }
+        return "5h \(Int(u.rounded()))%"
     }
 
     private var tint: Color {

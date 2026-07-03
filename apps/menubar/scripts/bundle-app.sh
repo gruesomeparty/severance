@@ -23,6 +23,15 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/Severance"
 
+# App icon (Finder / notifications / login-items list). Non-fatal if it fails.
+if bash scripts/make-icon.sh "$APP/Contents/Resources/AppIcon.icns" >/dev/null 2>&1; then
+	echo "==> icon: AppIcon.icns"
+	ICON_KEY='  <key>CFBundleIconFile</key><string>AppIcon</string>'
+else
+	echo "==> icon: skipped"
+	ICON_KEY=''
+fi
+
 cat >"$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -32,6 +41,7 @@ cat >"$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleDisplayName</key><string>Severance</string>
   <key>CFBundleIdentifier</key><string>com.gruesomeparty.severance</string>
   <key>CFBundleExecutable</key><string>Severance</string>
+$ICON_KEY
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key><string>$VERSION</string>

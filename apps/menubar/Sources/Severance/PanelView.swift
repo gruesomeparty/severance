@@ -1,9 +1,11 @@
+import AppKit
 import SeveranceCore
 import SwiftUI
 
 struct PanelView: View {
     @EnvironmentObject var store: SeveranceStore
     @Environment(\.colorScheme) private var scheme
+    @StateObject private var loginItem = LoginItem()
 
     private var p: Palette { Palette(scheme: scheme) }
 
@@ -130,12 +132,30 @@ struct PanelView: View {
     }
 
     private var footer: some View {
-        HStack {
-            Text("~/.claude/severance")
-            Spacer()
-            Text("please enjoy each window equally")
+        VStack(spacing: 8) {
+            HStack {
+                Toggle("Launch at login", isOn: Binding(
+                    get: { loginItem.isEnabled },
+                    set: { loginItem.set($0) }
+                ))
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .font(.mono(10))
+                .foregroundStyle(p.inkSoft)
+                Spacer()
+                Button("Refresh") { store.refresh() }
+                    .buttonStyle(.plain).font(.mono(10)).foregroundStyle(p.inkMute)
+                Text("·").foregroundStyle(p.inkMute)
+                Button("Quit") { NSApplication.shared.terminate(nil) }
+                    .buttonStyle(.plain).font(.mono(10)).foregroundStyle(p.inkMute)
+            }
+            HStack {
+                Text("~/.claude/severance")
+                Spacer()
+                Text("please enjoy each window equally")
+            }
+            .font(.mono(9.5)).foregroundStyle(p.inkMute).opacity(0.85)
         }
-        .font(.mono(9.5)).foregroundStyle(p.inkMute).opacity(0.85)
         .padding(.horizontal, 16).padding(.vertical, 10)
         .overlay(Divider().overlay(p.hairline), alignment: .top)
     }
