@@ -48,8 +48,8 @@ public final class SeveranceStore: ObservableObject {
         refresh()
         seededResets = true
         startWatching()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refresh() }
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
+            Task { @MainActor [weak self] in self?.refresh() }
         }
     }
 
@@ -117,8 +117,8 @@ public final class SeveranceStore: ObservableObject {
             let base = max(entry.fireAt.timeIntervalSinceNow, 0)
             let delay = base + Double(index) * stagger // priority-ordered bands, staggered
             let name = entry.project.name
-            let t = Timer.scheduledTimer(withTimeInterval: max(delay, 0.5), repeats: false) { [weak self] _ in
-                Task { @MainActor in self?.runResume(projectName: name) }
+            let t = Timer.scheduledTimer(withTimeInterval: max(delay, 0.5), repeats: false) { _ in
+                Task { @MainActor [weak self] in self?.runResume(projectName: name) }
             }
             resumeTimers.append(t)
         }
