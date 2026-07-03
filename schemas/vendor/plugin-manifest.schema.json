@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/gruesomeparty/severance/schemas/vendor/plugin-manifest.schema.json",
+  "title": "Claude Code plugin.json (vendored minimal)",
+  "description": "Structural mirror of the fields Severance relies on. Authoritative validation is `claude plugin validate --strict`; this catches gross drift in CI. Verified 2026-07-03 (docs/upstream-snapshots/plugins-reference.md).",
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+    "version": { "type": "string" },
+    "description": { "type": "string" },
+    "author": {
+      "type": ["object", "string"],
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "url": { "type": "string" }
+      }
+    },
+    "homepage": { "type": "string" },
+    "repository": { "type": "string" },
+    "license": { "type": "string" },
+    "keywords": { "type": "array", "items": { "type": "string" } }
+  }
+}
