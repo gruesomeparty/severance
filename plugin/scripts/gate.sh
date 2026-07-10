@@ -26,6 +26,10 @@ _j() { printf '%s' "$input" | jq -r "$1" 2>/dev/null || true; }
 cwd="$(_j '.cwd // empty')"
 [ -n "$cwd" ] || cwd="$PWD"
 session_id="$(_j '.session_id // empty')"
+# The per-session state path partitions on a real session id (#15); without one
+# there is nothing to key a file on and any record we wrote would violate the
+# schema (session_id is required, non-null). No id -> silent no-op (allow).
+[ -n "$session_id" ] || exit 0
 file_path="$(_j '.tool_input.file_path // empty')"
 slug="$(sev_slug "$cwd")"
 sf="$(sev_project_state_file "$slug" "$session_id")"
@@ -120,7 +124,7 @@ if [ "$trip" -eq 0 ]; then
       session_cost_usd:(if $cost=="" then null else ($cost|tonumber) end),
       limit_usd:(if $limit=="" then null else ($limit|tonumber) end),
       signal_tier:(if $tier=="none" or $tier=="" then null else $tier end),
-      session_id:(if $sid=="" then null else $sid end),
+      session_id:$sid,
       blocked_count:0, ts:($ts|tonumber)
     }' \
 		--arg n "$slug" --arg cwd "$cwd" --arg p "$prio" --arg cost "${proj_cost:-}" \
@@ -161,7 +165,7 @@ sev_state_merge "$sf" '
     utilization_at_trip:(if $uat=="" then null else ($uat|tonumber) end),
     signal_tier:(if $tier=="none" or $tier=="" then null else $tier end),
     tmux_pane:(if $pane=="" then null else $pane end),
-    session_id:(if $sid=="" then null else $sid end),
+    session_id:$sid,
     severed_at:$sev,
     resume_at:(if $resume=="" then null else $resume end),
     resume_count:($rc|tonumber), blocked_count:($blocked|tonumber), ts:($ts|tonumber)

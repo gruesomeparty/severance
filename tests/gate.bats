@@ -99,6 +99,17 @@ _hook() {
 	jq -e '.session_id=="s2"' "$SEVERANCE_STATE_DIR/projects/proj/s2.json"
 }
 
+@test "#15: empty session_id is a silent no-op (no per-session file written)" {
+	_usage 85 40 # would otherwise trip on session utilization
+	jq -nc --arg cwd "$CWD" \
+		'{hook_event_name:"PreToolUse", session_id:"", cwd:$cwd, tool_name:"Bash", tool_input:{command:"ls"}}' \
+		>"$SEV_TMP/in.json"
+	run "$GATE" <"$SEV_TMP/in.json"
+	[ "$status" -eq 0 ]
+	# no per-session record can be keyed without an id, so none is written
+	[ -z "$(find "$SEVERANCE_STATE_DIR/projects" -type f 2>/dev/null)" ]
+}
+
 @test "gate state validates against the project-state schema" {
 	_usage 85 40
 	_hook Bash
