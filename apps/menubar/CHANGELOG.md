@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/gruesomeparty/severance/compare/menubar-v1.1.1...menubar-v1.2.0) (2026-07-10)
+
+
+### Features
+
+* partition project state per session ([#15](https://github.com/gruesomeparty/severance/issues/15)) ([#29](https://github.com/gruesomeparty/severance/issues/29)) ([8806651](https://github.com/gruesomeparty/severance/commit/8806651aeac7cd32d48d5ae448a80c34cf5fb68c))
+
 ## [1.1.1](https://github.com/gruesomeparty/severance/compare/menubar-v1.1.0...menubar-v1.1.1) (2026-07-03)
 
 
