@@ -85,39 +85,151 @@ sev_normalize() {
 # ---- atomic I/O & locking ---------------------------------------------------
 
 # sev_atomic_write <dest> — write stdin to <dest> atomically (mktemp in the same
-# directory + mv, so readers never see a partial file).
+# directory + mv, so readers never see a partial file). mktemp+cat+mv run in a
+# nested subshell with their own EXIT/INT/TERM trap so a death before the mv
+# (e.g. the writer killed mid-write, #25) leaves no `.sev.*` behind. Being a
+# NESTED subshell, this trap can never clobber sev_locked's own release trap
+# (see sev_locked) or a caller's trap in the un-subshelled parent process —
+# each trap table lives in its own process, and mv is the atomic commit point,
+# so the trap's `rm -f` is a harmless no-op once it lands.
 sev_atomic_write() {
 	local dest="$1" dir tmp
 	dir="$(dirname -- "$dest")"
 	mkdir -p "$dir"
 	tmp="$(mktemp "$dir/.sev.XXXXXX")"
-	cat >"$tmp"
-	mv -f "$tmp" "$dest"
+	(
+		trap 'rm -f "$tmp"' EXIT INT TERM
+		cat >"$tmp"
+		mv -f "$tmp" "$dest"
+	)
+}
+
+# _sev_file_age_secs <path> — seconds since <path>'s mtime (BSD `stat -f` vs GNU
+# `stat -c`). Used by sev_locked's mkdir-fallback to detect a stale lock dir.
+_sev_file_age_secs() {
+	local f="$1" mtime now
+	now="$(sev_now 2>/dev/null || date +%s)"
+	mtime="$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null)" || return 1
+	printf '%s\n' "$((now - mtime))"
+}
+
+# _sev_lock_reclaimable <lockdir> <stale_secs> — on success (exit 0), prints
+# the pid a waiter judged reclaimable (empty if none was recorded) and may
+# steal <lockdir>. Liveness-primary (D1): a recorded holder pid ($lockdir/pid,
+# published by sev_locked right after mkdir) that's dead is reclaimed
+# immediately, regardless of age. A holder proven alive (`kill -0`) is
+# reclaimed only once age >= <stale_secs> — a large ceiling, meant purely as a
+# reboot/PID-reuse backstop (kill -0 can false-positive "alive" against an
+# unrelated process that happens to now hold the same, recycled pid after a
+# reboot). A missing pid file — the ms window before a fresh holder publishes
+# it, or a lock dir predating this field — is treated the same as a live
+# holder: fresh unless age >= that same ceiling.
+_sev_lock_reclaimable() {
+	local lockdir="$1" stale="$2" age pid
+	pid=""
+	{ IFS= read -r pid <"$lockdir/pid"; } 2>/dev/null
+	if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+		age="$(_sev_file_age_secs "$lockdir" 2>/dev/null)" || return 1
+		[ "$age" -ge "$stale" ] || return 1
+		printf '%s\n' "$pid"
+		return 0
+	fi
+	if [ -n "$pid" ]; then
+		printf '%s\n' "$pid" # dead: reclaim now, regardless of age
+		return 0
+	fi
+	age="$(_sev_file_age_secs "$lockdir" 2>/dev/null)" || return 1
+	[ "$age" -ge "$stale" ] || return 1
+	printf '\n' # no pid on record, but old enough to be the ceiling case
+	return 0
 }
 
 # sev_locked <lockfile> <cmd...> — run <cmd...> holding an exclusive lock.
-# Uses flock when available; otherwise a portable mkdir mutex (macOS has no flock).
-# Returns the command's exit status (75/EX_TEMPFAIL if the lock can't be acquired).
+# Uses flock when available; otherwise a portable mkdir mutex (macOS has no
+# flock; set SEV_LOCK_NO_FLOCK=1 to force the mkdir fallback on any host, for
+# testing). Returns the command's exit status (75/EX_TEMPFAIL if the lock can't
+# be acquired).
+#
+# The mkdir fallback recovers a stale lock dir (#25: a dead holder — e.g.
+# killed mid-write — used to leak it forever, wedging every future sev_locked
+# caller) via _sev_lock_reclaimable's liveness-primary rule (D1, see its
+# header) rather than pure age: a holder this call can independently prove
+# alive is never stolen from, no matter how long its critical section runs.
+#
+# The steal is still a mv-then-rm so two racers can't both reclaim (#25's
+# original protection), but the staleness check and the mv aren't atomic with
+# each other: the lock dir a waiter judged reclaimable can be freed and
+# legitimately re-acquired by a brand-new holder in the gap between them (D4).
+# After the mv, the stashed dir's pid is re-read; if it no longer matches what
+# was judged reclaimable a moment ago, this call grabbed someone else's fresh
+# lock instead of the stale one — best-effort restore it (mv back, only if the
+# real "$lockdir" slot is free) and keep waiting rather than destroy it. If
+# the slot's already been retaken by then too, the stash is dropped; this is a
+# documented, single-host/same-user, sub-millisecond residual window (see
+# docs/DEVIATIONS.md D5). A lock that can't be reclaimed at all (e.g. a
+# permission failure on the mv/rm) still advances the ~20s spin-cap accounting
+# below on every failed-mkdir iteration, reclaim attempted or not, so it
+# returns 75 rather than busy-spinning forever (D5).
+#
+# Release is trap-based, scoped to a nested subshell running the critical
+# section: "$@" executes inside `( trap ... EXIT INT TERM; "$@" )`, so its
+# trap lives in that subshell's own trap table and can't clobber a trap
+# sev_atomic_write sets in ITS OWN nested subshell (D2/D3 — previously both
+# traps lived in the same process and the second install silently replaced
+# the first, leaking the lock dir if a signal landed during the write) nor a
+# trap the caller had already set before calling sev_locked (D2 — previously
+# an unconditional `trap - EXIT INT TERM` cleared it). Nothing runs after the
+# subshell returns beyond reporting its status: an unconditional second
+# cleanup there would race a brand-new holder who's already re-acquired the
+# same lock dir name by then (proven empirically) — the subshell's own EXIT
+# trap is the sole release point.
 sev_locked() {
 	local lockfile="$1"
 	shift
-	if command -v flock >/dev/null 2>&1; then
+	if [ -z "${SEV_LOCK_NO_FLOCK:-}" ] && command -v flock >/dev/null 2>&1; then
 		(
 			flock -x 9 || exit 75
 			"$@"
 		) 9>"$lockfile"
 		return $?
 	fi
-	local lockdir="$lockfile.d" waited=0 rc=0
+	local lockdir="$lockfile.d" waited=0 rc=0 stale expected_pid stash now_pid
+	stale="${SEV_LOCK_STALE_SECS:-300}"
 	while ! mkdir "$lockdir" 2>/dev/null; do
+		if expected_pid="$(_sev_lock_reclaimable "$lockdir" "$stale" 2>/dev/null)"; then
+			stash="$lockdir.stale.${BASHPID:-$$}.$waited"
+			if mv "$lockdir" "$stash" 2>/dev/null; then
+				now_pid=""
+				{ IFS= read -r now_pid <"$stash/pid"; } 2>/dev/null
+				if [ "$now_pid" = "$expected_pid" ]; then
+					rm -rf "$stash" 2>/dev/null
+				else
+					{ [ ! -e "$lockdir" ] && mv "$stash" "$lockdir" 2>/dev/null; } || rm -rf "$stash" 2>/dev/null
+				fi
+			fi
+		fi
 		sleep 0.05
 		waited=$((waited + 1))
 		if [ "$waited" -ge 400 ]; then # ~20s
 			return 75
 		fi
 	done
-	"$@" || rc=$?
-	rmdir "$lockdir" 2>/dev/null || true
+
+	# Publish our pid via mktemp+mv (not a direct write) so a concurrent
+	# reader in _sev_lock_reclaimable never sees a torn/partial write.
+	printf '%s' "${BASHPID:-$$}" >"$lockdir/.pid.${BASHPID:-$$}" 2>/dev/null &&
+		mv -f "$lockdir/.pid.${BASHPID:-$$}" "$lockdir/pid" 2>/dev/null || true
+
+	if (
+		trap 'rm -rf "$lockdir" 2>/dev/null || true' EXIT
+		trap 'exit 143' TERM
+		trap 'exit 130' INT
+		"$@"
+	); then
+		rc=0
+	else
+		rc=$?
+	fi
 	return "$rc"
 }
 

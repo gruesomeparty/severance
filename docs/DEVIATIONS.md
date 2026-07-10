@@ -103,9 +103,101 @@ creation, ~20s timeout) otherwise (macOS). Independently, `sev_atomic_write`
 always uses `mktemp` + `mv`, and rename is atomic on POSIX — so whole-file
 replaces (e.g. `usage.json`) never interleave even without a lock; the lock only
 serializes read-modify-write of shared files. Net behavior matches the PRD's
-intent on both platforms.
+intent on both platforms. `flock` is auto-used whenever present — it is not a
+required install; there is no fallback-vs-flock behavior gap left to document
+in the README.
 
 **Evidence:** `command -v flock` → missing on macOS 15.
+
+**Update (#25, crash-safety):** the mkdir mutex had no stale-lock recovery: a
+holder that died between `mkdir "$lockdir"` and `rmdir "$lockdir"` (observed
+trigger — Claude Code killing the `statusline-bridge.sh` subprocess mid-write
+on its statusline timeout) leaked the lock dir forever, freezing the shared
+state file for every future caller. The first fix reclaimed any lock dir at
+least `SEV_LOCK_STALE_SECS` old — pure age, no liveness check — which traded
+the leak for a worse bug below.
+
+**Update (consolidated fix, five defects found in review of the above):**
+
+- **Liveness, not just age (lost updates).** Pure-age reclaim meant a
+  still-*alive* holder whose critical section happened to run past
+  `SEV_LOCK_STALE_SECS` got its lock dir stolen out from under it — two
+  concurrent holders, lost updates on any read-modify-write state (a
+  concurrent real-increment test reliably lands short of the writer count
+  before this fix and exactly on it after; see `tests/locking.bats`). Fixed
+  with a recorded holder pid: right after
+  `mkdir` succeeds, the holder publishes `$BASHPID` into `"$lockdir/pid"`
+  (via `mktemp` + `mv`, so a concurrent reader never sees a torn write). A
+  waiter reclaims only when the recorded pid is dead (`kill -0` fails —
+  immediate, regardless of age) or when age reaches `SEV_LOCK_STALE_SECS`
+  (default **raised to 300s**) — a large ceiling meant purely as a
+  reboot/PID-reuse backstop (`kill -0` can false-positive "alive" against an
+  unrelated process that later reuses the same, recycled pid), not something
+  normal contention should ever reach. A missing pid file (the ms window
+  before a fresh holder publishes it, or a lock dir predating this field) is
+  treated the same as live: fresh unless age hits that same ceiling.
+
+- **Trap isolation (D2/D3, the exact #25 trigger reintroduced).** The
+  original fix released via `trap ... EXIT INT TERM` set directly in
+  `sev_locked`'s own process; `sev_atomic_write` did the same for its
+  `mktemp` temp. On the mkdir path both traps live in the *same* process, so
+  installing the second silently replaced the first — a signal during
+  `sev_atomic_write`'s `cat >"$tmp"` (a real caller composition:
+  `sev_locked ... sev_atomic_write ...`) cleaned up the temp but leaked the
+  lock dir again. Separately, `sev_locked` unconditionally cleared
+  `EXIT INT TERM` on the way out, so a *caller's own* trap (set before
+  calling `sev_state_merge`) was silently wiped rather than preserved. Fixed
+  by running each release in its own **nested subshell**:
+  `sev_locked` runs `"$@"` inside `( trap 'rm -rf "$lockdir"' EXIT;
+  trap 'exit 143' TERM; trap 'exit 130' INT; "$@" )`, and `sev_atomic_write`
+  wraps its own `mktemp`+`cat`+`mv` in a second, independently-nested
+  subshell. A trap set in a nested subshell lives in that subshell's own
+  trap table — it can't clobber a trap in the parent process (the caller's)
+  or in a sibling nested subshell (`sev_atomic_write`'s vs. `sev_locked`'s).
+  There is deliberately **no cleanup after the subshell returns**: an
+  earlier draft added a same-process `rm -rf "$lockdir"` there "as a belt,"
+  which is actively wrong — a brand-new holder can legitimately re-`mkdir`
+  the same lock dir name in the gap between the subshell's own exit and that
+  line running, and the belt would then destroy their live lock (reproduced
+  empirically under real concurrency). The subshell's own `EXIT` trap is the
+  sole release point.
+
+- **TOCTOU on the steal (D4).** The staleness check and the `mv`-aside
+  aren't atomic with each other: a lock dir judged reclaimable can be freed
+  and legitimately re-acquired by a brand-new holder in the gap between
+  them, and the waiter would then steal from that new, live holder instead
+  of the stale one it actually meant to reclaim. Mitigated by re-reading the
+  stashed dir's pid immediately after the `mv`: if it no longer matches what
+  was judged reclaimable a moment ago, this call grabbed someone else's
+  fresh lock — best-effort restore it (`mv` back, only if the real
+  `"$lockdir"` slot is currently free) and keep waiting, rather than
+  destroying it. If the slot's already been retaken by the time the restore
+  is attempted too, the stash is dropped instead. This narrows the window to
+  a single-host, same-user, sub-millisecond race rather than closing it
+  outright — an acceptable, documented residual given the mkdir-mutex is
+  itself only a portable fallback for hosts without `flock`.
+
+- **Spin-cap bypass (D5).** The steal branch's `continue` (in the original,
+  age-only fix) skipped the `waited`/400-iteration (~20s) accounting
+  entirely, so a lock dir that couldn't actually be reclaimed (e.g. a
+  permission failure on the `mv`/`rm`) busy-spun forever instead of ever
+  hitting the cap. Fixed by always advancing `waited` and re-checking the
+  cap on every failed-`mkdir` iteration, whether a reclaim was attempted,
+  succeeded, or was skipped.
+
+The flock branch (Linux) is unchanged throughout — it already runs `"$@"` in
+its own subshell per invocation and never touches a caller's trap.
+
+**Evidence:** `tests/locking.bats` — three tests each fail against the pre-fix
+code and pass after it: a 10-writer concurrent RMW (no lost updates), a
+caller's own trap surviving a direct `sev_state_merge` call, and an
+unreclaimable lock dir returning 75 within the spin cap rather than hanging. A
+fourth test exercises signal-during-write through the real `sev_locked` +
+`sev_atomic_write` composition (no temp or lock dir left behind); it documents
+the fixed behaviour but does **not** by itself discriminate old vs new — under
+bash trap semantics a *caught* signal still let the pre-fix code's explicit
+post-`"$@"` cleanup release the lock, so the dir only leaks on *uncatchable*
+termination (SIGKILL), which is covered instead by the dead-pid reclaim.
 
 ---
 
