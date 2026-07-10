@@ -152,7 +152,7 @@ _sev_test_dead_pid() {
 	# Writer count is deliberately below the PRD's illustrative "50": on this
 	# (shared, contended) CI-equivalent host, 50 truly-concurrent bash
 	# processes each forking jq/mktemp/mv made the fixed (correct,
-	# fully-serializing) case itself take minutes under load; 20 already
+	# fully-serializing) case itself take minutes under load; 10 already
 	# reliably reproduces the pre-fix loss and reliably proves the fix.
 	export SEV_LOCK_NO_FLOCK=1
 	n_writers=10

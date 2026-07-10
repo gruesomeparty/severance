@@ -197,14 +197,14 @@ sev_locked() {
 	stale="${SEV_LOCK_STALE_SECS:-300}"
 	while ! mkdir "$lockdir" 2>/dev/null; do
 		if expected_pid="$(_sev_lock_reclaimable "$lockdir" "$stale" 2>/dev/null)"; then
-			stash="$lockdir.stale.$BASHPID.$waited"
+			stash="$lockdir.stale.${BASHPID:-$$}.$waited"
 			if mv "$lockdir" "$stash" 2>/dev/null; then
 				now_pid=""
 				{ IFS= read -r now_pid <"$stash/pid"; } 2>/dev/null
 				if [ "$now_pid" = "$expected_pid" ]; then
 					rm -rf "$stash" 2>/dev/null
 				else
-					mv "$stash" "$lockdir" 2>/dev/null || rm -rf "$stash" 2>/dev/null
+					{ [ ! -e "$lockdir" ] && mv "$stash" "$lockdir" 2>/dev/null; } || rm -rf "$stash" 2>/dev/null
 				fi
 			fi
 		fi
@@ -217,8 +217,8 @@ sev_locked() {
 
 	# Publish our pid via mktemp+mv (not a direct write) so a concurrent
 	# reader in _sev_lock_reclaimable never sees a torn/partial write.
-	printf '%s' "$BASHPID" >"$lockdir/.pid.$BASHPID" 2>/dev/null &&
-		mv -f "$lockdir/.pid.$BASHPID" "$lockdir/pid" 2>/dev/null
+	printf '%s' "${BASHPID:-$$}" >"$lockdir/.pid.${BASHPID:-$$}" 2>/dev/null &&
+		mv -f "$lockdir/.pid.${BASHPID:-$$}" "$lockdir/pid" 2>/dev/null || true
 
 	if (
 		trap 'rm -rf "$lockdir" 2>/dev/null || true' EXIT

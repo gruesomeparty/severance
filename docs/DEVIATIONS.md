@@ -188,12 +188,16 @@ the leak for a worse bug below.
 The flock branch (Linux) is unchanged throughout — it already runs `"$@"` in
 its own subshell per invocation and never touches a caller's trap.
 
-**Evidence:** `tests/locking.bats` — 10-writer concurrent RMW (no lost
-updates), signal-during-write via the real `sev_locked` + `sev_atomic_write`
-composition (no temp, no lock dir), a caller's own trap surviving a direct
-`sev_state_merge` call, and an unreclaimable lock dir returning 75 within the
-spin cap rather than hanging. All four reproduce the pre-fix defect and pass
-after it.
+**Evidence:** `tests/locking.bats` — three tests each fail against the pre-fix
+code and pass after it: a 10-writer concurrent RMW (no lost updates), a
+caller's own trap surviving a direct `sev_state_merge` call, and an
+unreclaimable lock dir returning 75 within the spin cap rather than hanging. A
+fourth test exercises signal-during-write through the real `sev_locked` +
+`sev_atomic_write` composition (no temp or lock dir left behind); it documents
+the fixed behaviour but does **not** by itself discriminate old vs new — under
+bash trap semantics a *caught* signal still let the pre-fix code's explicit
+post-`"$@"` cleanup release the lock, so the dir only leaks on *uncatchable*
+termination (SIGKILL), which is covered instead by the dead-pid reclaim.
 
 ---
 
