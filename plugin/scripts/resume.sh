@@ -74,7 +74,7 @@ _resume_all() {
 	stagger="$(_stagger_secs)"
 	for band in critical high normal low; do
 		local due=()
-		for f in "$state_dir"/projects/*.json; do
+		for f in "$state_dir"/projects/*/*.json; do
 			[ -e "$f" ] || continue
 			[ "$(jq -r '.status // ""' "$f" 2>/dev/null || true)" = "severed" ] || continue
 			[ "$(jq -r '.priority // "normal"' "$f" 2>/dev/null || echo normal)" = "$band" ] || continue

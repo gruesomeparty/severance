@@ -17,8 +17,11 @@ input="$(cat)"
 cwd="$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null || true)"
 [ -n "$cwd" ] || cwd="$PWD"
 session_id="$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null || true)"
+# Per-session state (#15) keys on a real session id; without one we cannot write
+# a schema-valid record (session_id is required, non-null). No id -> no-op.
+[ -n "$session_id" ] || exit 0
 slug="$(sev_slug "$cwd")"
-sf="$(sev_project_state_file "$slug")"
+sf="$(sev_project_state_file "$slug" "$session_id")"
 prio="$(sev_config_get SEVERANCE_PRIORITY normal)"
 
 usage_file="$(sev_state_dir)/usage.json"
@@ -36,7 +39,7 @@ sev_state_merge "$sf" '
   . + {
     name:$n, cwd:$cwd,
     priority:(.priority // $p),
-    session_id:(if $sid=="" then .session_id else $sid end),
+    session_id:$sid,
     session_cost_usd:(if $cost=="" then .session_cost_usd else ($cost|tonumber) end),
     signal_tier:(if $tier=="" then .signal_tier else $tier end),
     status:(if (.status=="severed" or .status=="paused") then .status else "active" end),

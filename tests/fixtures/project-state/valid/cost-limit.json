@@ -11,5 +11,6 @@
   "severed_at": "2026-07-02T14:00:00Z",
   "resume_at": null,
   "resume_count": 0,
-  "paused": false
+  "paused": false,
+  "session_id": "sess-cost-01"
 }

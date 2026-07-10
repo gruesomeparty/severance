@@ -24,10 +24,12 @@ teardown() {
 	sev_teardown_tmp
 }
 
-_mkstate() { # <slug> <priority> <status>
-	jq -n --arg n "$1" --arg c "/x/$1" --arg p "$2" --arg s "$3" \
-		'{name:$n, cwd:$c, status:$s, priority:$p, paused:($s=="paused"), resume_count:0}' \
-		>"$PROJ/$1.json"
+_mkstate() { # <slug> <priority> <status> [session_id]
+	local sid="${4:-s}"
+	mkdir -p "$PROJ/$1"
+	jq -n --arg n "$1" --arg c "/x/$1" --arg p "$2" --arg s "$3" --arg sid "$sid" \
+		'{name:$n, cwd:$c, status:$s, priority:$p, paused:($s=="paused"), session_id:$sid, resume_count:0}' \
+		>"$PROJ/$1/$sid.json"
 }
 
 _run_high_preemptor() {
@@ -44,18 +46,29 @@ _run_high_preemptor() {
 	_mkstate crit-proj critical active
 	_run_high_preemptor
 	[ "$status" -eq 0 ] # the high preemptor itself does not trip at 65
-	jq -e '.paused==true and .reason=="preempted" and .preempted_by=="high-proj" and .status=="paused"' "$PROJ/normal-proj.json"
-	jq -e '.status=="active" and .paused==false' "$PROJ/crit-proj.json"
-	run check-jsonschema --schemafile "$SEV_ROOT/schemas/project-state.schema.json" "$PROJ/normal-proj.json"
+	jq -e '.paused==true and .reason=="preempted" and .preempted_by=="high-proj" and .status=="paused"' "$PROJ/normal-proj/s.json"
+	jq -e '.status=="active" and .paused==false' "$PROJ/crit-proj/s.json"
+	run check-jsonschema --schemafile "$SEV_ROOT/schemas/project-state.schema.json" "$PROJ/normal-proj/s.json"
 	[ "$status" -eq 0 ]
+}
+
+@test "#15: preemption is per-session — a sibling session of the preemptor's slug is untouched" {
+	_mkstate normal-proj normal active
+	# The preemptor slug (high-proj) has a second, concurrent session: it must NOT
+	# be preempted by its own sweep (same slug, same priority).
+	_mkstate high-proj high active h2
+	_run_high_preemptor
+	[ "$status" -eq 0 ]
+	jq -e '.paused==true and .status=="paused"' "$PROJ/normal-proj/s.json"
+	jq -e '.status=="active" and .paused==false' "$PROJ/high-proj/h2.json"
 }
 
 @test "AC11: a preempted project trips within one PreToolUse (reason=preempted)" {
 	local cwd="$SEV_TMP/normal-proj"
-	mkdir -p "$cwd/.severance"
+	mkdir -p "$cwd/.severance" "$PROJ/normal-proj"
 	jq -n --arg c "$cwd" \
-		'{name:"normal-proj", cwd:$c, status:"paused", priority:"normal", paused:true, reason:"preempted", preempted_by:"high-proj", resume_count:0}' \
-		>"$PROJ/normal-proj.json"
+		'{name:"normal-proj", cwd:$c, status:"paused", priority:"normal", paused:true, reason:"preempted", preempted_by:"high-proj", session_id:"n", resume_count:0}' \
+		>"$PROJ/normal-proj/n.json"
 	jq -nc --arg cwd "$cwd" \
 		'{hook_event_name:"PreToolUse", session_id:"n", cwd:$cwd, tool_name:"Bash", tool_input:{command:"ls"}}' \
 		>"$SEV_TMP/in.json"
@@ -68,16 +81,16 @@ _run_high_preemptor() {
 	_mkstate high2 high active
 	_mkstate low-sev low severed
 	_run_high_preemptor
-	jq -e '.paused==false and .status=="active"' "$PROJ/high2.json"
-	jq -e '.status=="severed" and .paused==false' "$PROJ/low-sev.json"
+	jq -e '.paused==false and .status=="active"' "$PROJ/high2/s.json"
+	jq -e '.status=="severed" and .paused==false' "$PROJ/low-sev/s.json"
 }
 
 @test "R5: the preemption sweep is throttled to once per 60s per preemptor" {
 	_mkstate normal-proj normal active
 	_run_high_preemptor
-	jq -e '.preempt_sweep_ts != null and .preempt_sweep_ts > 0' "$PROJ/high-proj.json"
+	jq -e '.preempt_sweep_ts != null and .preempt_sweep_ts > 0' "$PROJ/high-proj/h.json"
 	# clear the pause, run again immediately -> throttled, so it is NOT re-paused
-	jq '.paused=false | .status="active" | .reason=null | .preempted_by=null' "$PROJ/normal-proj.json" >"$SEV_TMP/np" && mv "$SEV_TMP/np" "$PROJ/normal-proj.json"
+	jq '.paused=false | .status="active" | .reason=null | .preempted_by=null' "$PROJ/normal-proj/s.json" >"$SEV_TMP/np" && mv "$SEV_TMP/np" "$PROJ/normal-proj/s.json"
 	_run_high_preemptor
-	jq -e '.paused==false' "$PROJ/normal-proj.json"
+	jq -e '.paused==false' "$PROJ/normal-proj/s.json"
 }

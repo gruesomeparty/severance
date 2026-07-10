@@ -37,8 +37,12 @@ teardown() {
 	[ "$(sev_ladder high weekly)" = "95" ]
 }
 
-@test "sev_project_state_file: lives under <state>/projects/<slug>.json" {
-	[ "$(sev_project_state_file myproj)" = "$SEVERANCE_STATE_DIR/projects/myproj.json" ]
+@test "sev_project_state_file: lives under <state>/projects/<slug>/<session_id>.json" {
+	[ "$(sev_project_state_file myproj sess-123)" = "$SEVERANCE_STATE_DIR/projects/myproj/sess-123.json" ]
+}
+
+@test "sev_project_state_file: sanitizes unsafe characters in the session id" {
+	[ "$(sev_project_state_file myproj 'a/b c')" = "$SEVERANCE_STATE_DIR/projects/myproj/a-b-c.json" ]
 }
 
 @test "sev_session_cost_file: lives under <state>/sessions/<session_id>.json" {

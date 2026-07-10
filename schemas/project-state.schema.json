@@ -2,10 +2,10 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/gruesomeparty/severance/schemas/project-state.schema.json",
   "title": "Severance project state",
-  "description": "~/.claude/severance/projects/<slug>.json — per-project state written by gate.sh, heartbeat.sh, resume.sh and the menu bar app. This directory IS the API between plugin and app (PRD §6.2).",
+  "description": "~/.claude/severance/projects/<slug>/<session_id>.json — per-session project state written by gate.sh, heartbeat.sh, resume.sh and the menu bar app. Partitioned by session_id (issue #15): concurrent same-repo sessions each own a file, so status/resume_at/tmux_pane/blocked_count no longer clobber one another. session_id keys the file and is therefore required and non-null. This directory IS the API between plugin and app (PRD §6.2).",
   "type": "object",
   "additionalProperties": false,
-  "required": ["name", "cwd", "status", "priority", "paused"],
+  "required": ["name", "cwd", "status", "priority", "paused", "session_id"],
   "properties": {
     "name": {
       "type": "string",
@@ -41,7 +41,11 @@
       "type": ["string", "null"],
       "description": "$TMUX_PANE at trip time, e.g. \"%12\"."
     },
-    "session_id": { "type": ["string", "null"] },
+    "session_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Claude Code session id from hook stdin; keys the state-file path projects/<slug>/<session_id>.json."
+    },
     "severed_at": { "type": ["string", "null"], "format": "date-time" },
     "resume_at": { "type": ["string", "null"], "format": "date-time" },
     "resume_count": {

@@ -15,17 +15,27 @@ public enum StateLoader {
         return try? decoder.decode(UsageCache.self, from: data)
     }
 
-    // projects/*.json — corrupt files are skipped; result sorted by priority desc, then name.
+    // projects/<slug>/<session_id>.json — one lifecycle record per session (issue
+    // #15). Recurse exactly one level: each entry under projects/ is a <slug>/
+    // directory whose *.json files are the per-session records. Corrupt files are
+    // skipped; result sorted by priority desc, then name.
     public static func loadProjects(in stateDir: URL) -> [ProjectState] {
+        let fm = FileManager.default
         let dir = stateDir.appendingPathComponent("projects")
-        guard let files = try? FileManager.default.contentsOfDirectory(
-            at: dir, includingPropertiesForKeys: nil
+        guard let slugs = try? fm.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: [.isDirectoryKey]
         ) else { return [] }
         var out: [ProjectState] = []
-        for f in files where f.pathExtension == "json" {
-            if let data = try? Data(contentsOf: f),
-               let p = try? decoder.decode(ProjectState.self, from: data) {
-                out.append(p)
+        for slug in slugs {
+            let isDir = (try? slug.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
+            guard isDir, let files = try? fm.contentsOfDirectory(
+                at: slug, includingPropertiesForKeys: nil
+            ) else { continue }
+            for f in files where f.pathExtension == "json" {
+                if let data = try? Data(contentsOf: f),
+                   let p = try? decoder.decode(ProjectState.self, from: data) {
+                    out.append(p)
+                }
             }
         }
         return out.sorted { a, b in

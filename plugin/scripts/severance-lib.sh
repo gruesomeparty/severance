@@ -152,9 +152,15 @@ sev_ladder() {
 	esac
 }
 
-# sev_project_state_file <slug> — path to a project's state JSON.
+# sev_project_state_file <slug> <session_id> — path to a session's project-state
+# JSON, partitioned per session (issue #15): projects/<slug>/<session_id>.json.
+# The session id is sanitized to a filesystem-safe token exactly as
+# sev_session_cost_file does, so concurrent same-repo sessions never clobber one
+# another's status/resume_at/tmux_pane/blocked_count.
 sev_project_state_file() {
-	printf '%s\n' "$(sev_state_dir)/projects/$1.json"
+	local sid
+	sid="$(printf '%s' "$2" | tr -c 'A-Za-z0-9._-' '-')"
+	printf '%s\n' "$(sev_state_dir)/projects/$1/$sid.json"
 }
 
 # sev_session_cost_file <session_id> — path to a session's per-session cost record
@@ -197,13 +203,15 @@ _sev_prio_rank() {
 	esac
 }
 
-# sev_preempt_sweep <slug> <priority> <session_util> — headroom preemption (§5.5).
-# When this project's band reserves headroom (non-null reserve) and session
-# utilization is at/above it, pause every ENABLED, strictly-LOWER-priority project
-# (a state file implies it was enabled) that is not already severed/orphaned.
-# Throttled to once per 60s per preemptor via preempt_sweep_ts (R5).
+# sev_preempt_sweep <slug> <session_id> <priority> <session_util> — headroom
+# preemption (§5.5). When this project's band reserves headroom (non-null reserve)
+# and session utilization is at/above it, pause every ENABLED, strictly-LOWER-
+# priority session RECORD (a state file implies it was enabled) that is not already
+# severed/orphaned. Preemption is per-session (issue #15): each lower-priority
+# session file is paused individually; the preemptor's own sessions (same slug) are
+# skipped. Throttled to once per 60s per preemptor session via preempt_sweep_ts (R5).
 sev_preempt_sweep() {
-	local slug="$1" prio="$2" util="$3"
+	local slug="$1" sid="$2" prio="$3" util="$4"
 	local reserve
 	reserve="$(sev_ladder "$prio" reserve)"
 	[ "$reserve" != "null" ] && [ -n "$reserve" ] || return 0
@@ -212,7 +220,7 @@ sev_preempt_sweep() {
 
 	local state_dir sf now last myrank
 	state_dir="$(sev_state_dir)"
-	sf="$(sev_project_state_file "$slug")"
+	sf="$(sev_project_state_file "$slug" "$sid")"
 	now="$(sev_now)"
 
 	last="$(jq -r '.preempt_sweep_ts // 0' "$sf" 2>/dev/null || echo 0)"
@@ -224,9 +232,9 @@ sev_preempt_sweep() {
 
 	myrank="$(_sev_prio_rank "$prio")"
 	local f other_slug other_prio other_status
-	for f in "$state_dir"/projects/*.json; do
+	for f in "$state_dir"/projects/*/*.json; do
 		[ -e "$f" ] || continue
-		other_slug="$(basename "$f" .json)"
+		other_slug="$(basename "$(dirname "$f")")"
 		[ "$other_slug" = "$slug" ] && continue
 		other_prio="$(jq -r '.priority // "normal"' "$f" 2>/dev/null || echo normal)"
 		other_status="$(jq -r '.status // "active"' "$f" 2>/dev/null || echo active)"

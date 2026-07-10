@@ -14,7 +14,8 @@ setup() {
 	export SEVERANCE_PRIORITY=normal
 	export SEVERANCE_OAUTH_FALLBACK=0
 	export SEVERANCE_CCUSAGE_CMD=false
-	SF="$SEVERANCE_STATE_DIR/projects/proj.json"
+	# Per-session state (#15): session_id "s1" from _hook, slug "proj" from cwd.
+	SF="$SEVERANCE_STATE_DIR/projects/proj/s1.json"
 }
 
 teardown() {
@@ -66,6 +67,47 @@ _hook() {
 	_hook Write "$CWD/.severance/handover.md"
 	run "$GATE" <"$SEV_TMP/in.json"
 	[ "$status" -eq 0 ]
+}
+
+@test "#15: first per-session write unlinks any legacy flat projects/<slug>.json" {
+	# A pre-upgrade flat record for this slug exists...
+	printf '%s' '{"name":"proj","cwd":"/x","status":"severed","priority":"normal","paused":false,"session_id":"old"}' \
+		>"$SEVERANCE_STATE_DIR/projects/proj.json"
+	_usage 10 10
+	_hook Bash
+	run "$GATE" <"$SEV_TMP/in.json"
+	[ "$status" -eq 0 ]
+	# ...it is gone (never read/migrated) and the per-session file now exists.
+	[ ! -f "$SEVERANCE_STATE_DIR/projects/proj.json" ]
+	[ -f "$SF" ]
+}
+
+@test "#15: two sessions of one slug keep independent per-session state files" {
+	_usage 10 10
+	_hook Bash
+	run "$GATE" <"$SEV_TMP/in.json"
+	[ "$status" -eq 0 ]
+	# a second session (s2) of the SAME slug
+	jq -nc --arg cwd "$CWD" \
+		'{hook_event_name:"PreToolUse", session_id:"s2", cwd:$cwd, tool_name:"Bash", tool_input:{command:"ls"}}' \
+		>"$SEV_TMP/in2.json"
+	run "$GATE" <"$SEV_TMP/in2.json"
+	[ "$status" -eq 0 ]
+	[ -f "$SEVERANCE_STATE_DIR/projects/proj/s1.json" ]
+	[ -f "$SEVERANCE_STATE_DIR/projects/proj/s2.json" ]
+	jq -e '.session_id=="s1"' "$SEVERANCE_STATE_DIR/projects/proj/s1.json"
+	jq -e '.session_id=="s2"' "$SEVERANCE_STATE_DIR/projects/proj/s2.json"
+}
+
+@test "#15: empty session_id is a silent no-op (no per-session file written)" {
+	_usage 85 40 # would otherwise trip on session utilization
+	jq -nc --arg cwd "$CWD" \
+		'{hook_event_name:"PreToolUse", session_id:"", cwd:$cwd, tool_name:"Bash", tool_input:{command:"ls"}}' \
+		>"$SEV_TMP/in.json"
+	run "$GATE" <"$SEV_TMP/in.json"
+	[ "$status" -eq 0 ]
+	# no per-session record can be keyed without an id, so none is written
+	[ -z "$(find "$SEVERANCE_STATE_DIR/projects" -type f 2>/dev/null)" ]
 }
 
 @test "gate state validates against the project-state schema" {

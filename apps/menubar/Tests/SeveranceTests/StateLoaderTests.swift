@@ -18,7 +18,11 @@ final class StateLoaderTests: XCTestCase {
     }
 
     private func write(_ name: String, _ json: String) throws {
-        try json.write(to: dir.appendingPathComponent(name), atomically: true, encoding: .utf8)
+        let url = dir.appendingPathComponent(name)
+        try FileManager.default.createDirectory(
+            at: url.deletingLastPathComponent(), withIntermediateDirectories: true
+        )
+        try json.write(to: url, atomically: true, encoding: .utf8)
     }
 
     private func project(_ json: String) throws -> ProjectState {
@@ -48,14 +52,28 @@ final class StateLoaderTests: XCTestCase {
     }
 
     func testLoadProjectsSkipsCorruptAndSortsByPriority() throws {
-        try write("projects/a-normal.json",
-                  #"{"name":"a-normal","cwd":"/x","status":"active","priority":"normal","paused":false}"#)
-        try write("projects/b-crit.json",
-                  #"{"name":"b-crit","cwd":"/x","status":"active","priority":"critical","paused":false}"#)
-        try write("projects/corrupt.json", "{ nope")
+        // Per-session layout: projects/<slug>/<session_id>.json (issue #15).
+        try write("projects/a-normal/s1.json",
+                  #"{"name":"a-normal","cwd":"/x","status":"active","priority":"normal","paused":false,"session_id":"s1"}"#)
+        try write("projects/b-crit/s2.json",
+                  #"{"name":"b-crit","cwd":"/x","status":"active","priority":"critical","paused":false,"session_id":"s2"}"#)
+        try write("projects/a-normal/corrupt.json", "{ nope")
         let ps = StateLoader.loadProjects(in: dir)
         XCTAssertEqual(ps.count, 2, "corrupt file must be skipped")
         XCTAssertEqual(ps.first?.priority, .critical, "highest priority first")
+    }
+
+    func testLoadProjectsTwoSessionsOfOneSlugYieldDistinctIds() throws {
+        // Two concurrent sessions of the same repo keep independent records and
+        // must produce distinct SwiftUI identities so one row per session renders.
+        try write("projects/repo/sess-1.json",
+                  #"{"name":"repo","cwd":"/x","status":"active","priority":"normal","paused":false,"session_id":"sess-1"}"#)
+        try write("projects/repo/sess-2.json",
+                  #"{"name":"repo","cwd":"/x","status":"active","priority":"normal","paused":false,"session_id":"sess-2"}"#)
+        let ps = StateLoader.loadProjects(in: dir)
+        XCTAssertEqual(ps.count, 2, "both session files under one slug must load")
+        XCTAssertEqual(Set(ps.map { $0.name }), ["repo"], "both share the slug name")
+        XCTAssertEqual(Set(ps.map { $0.id }).count, 2, "sessions of one slug must have distinct ids")
     }
 
     func testPartialProjectDecodesWithNilOptionals() throws {

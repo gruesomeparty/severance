@@ -4,10 +4,11 @@ Source: `https://code.claude.com/docs/en/hooks.md` — captured 2026-07-03.
 
 ## Events Severance registers
 
-`PreToolUse`, `SessionStart`, `Stop` — all confirmed present with these exact
-spellings. (The event set is much larger now — `PostToolUse`, `SessionEnd`,
+`PreToolUse`, `SessionStart`, `Stop`, `SessionEnd` — all confirmed present with
+these exact spellings. (The event set is much larger now — `PostToolUse`,
 `SubagentStart/Stop`, `PermissionRequest`, `TaskCreated`, etc. — but Severance
-only needs these three.)
+only needs these four.) `SessionEnd` was added for the per-session project-state
+cleanup hook (#15); its stdin shape is verified below.
 
 ## stdin payloads
 
@@ -53,6 +54,26 @@ whitelist writes under `.severance/` by parsing `.tool_input.file_path`
   "hook_event_name": "Stop"
 }
 ```
+
+### SessionEnd
+```json
+{
+  "session_id": "abc123",
+  "transcript_path": "/…/….jsonl",
+  "cwd": "/…",
+  "hook_event_name": "SessionEnd",
+  "reason": "other"
+}
+```
+In addition to the [common input fields](#common-input-fields) (which include
+`session_id` and `cwd`), SessionEnd delivers a `reason`
+(`clear | resume | logout | prompt_input_exit | bypass_permissions_disabled |
+other`). **`.session_id` and `.cwd` are both present** — enough for the cleanup
+hook (#15) to resolve `projects/<slug>/<session_id>.json` and remove it. SessionEnd
+has **no decision control** (cannot block termination; side-effects only) and a
+default timeout of 1.5s (raise per-hook via `timeout`). No deviation from the PRD:
+the PRD did not specify SessionEnd; upstream matches the shape the cleanup hook
+needs. Verified against `raw/hooks.md` (SessionEnd input, captured 2026-07-03).
 
 ## Exit-code semantics (verbatim, the rows Severance relies on)
 

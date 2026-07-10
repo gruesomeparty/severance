@@ -6,5 +6,6 @@
   "priority": "high",
   "preempted_by": null,
   "paused": true,
-  "preempt_sweep_ts": 1751450000
+  "preempt_sweep_ts": 1751450000,
+  "session_id": "sess-paused-01"
 }

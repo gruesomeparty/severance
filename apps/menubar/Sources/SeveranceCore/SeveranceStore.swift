@@ -69,8 +69,17 @@ public final class SeveranceStore: ObservableObject {
         }
     }
 
+    // Watch projects/ rather than the top state dir: per-session records now live
+    // at projects/<slug>/<session_id>.json (issue #15), and a session appearing or
+    // ending adds/removes its <slug>/ dir entry, firing this source. A single
+    // non-recursive DispatchSource can't observe writes *inside* each <slug>/ dir,
+    // so edits to an existing record (e.g. a sever/resume flip) are caught by the
+    // 30s pollTimer, which remains the safety net. Fall back to the state dir if
+    // projects/ does not exist yet (first run); the poll picks it up regardless.
     private func startWatching() {
-        let fd = open(stateDir.path, O_EVTONLY)
+        let projects = stateDir.appendingPathComponent("projects")
+        let target = FileManager.default.fileExists(atPath: projects.path) ? projects : stateDir
+        let fd = open(target.path, O_EVTONLY)
         guard fd >= 0 else { return }
         let src = DispatchSource.makeFileSystemObjectSource(
             fileDescriptor: fd, eventMask: [.write, .rename, .delete], queue: .main
@@ -116,9 +125,10 @@ public final class SeveranceStore: ObservableObject {
         for (index, entry) in StateLoader.resumeSchedule(projects).enumerated() {
             let base = max(entry.fireAt.timeIntervalSinceNow, 0)
             let delay = base + Double(index) * stagger // priority-ordered bands, staggered
-            let name = entry.project.name
+            let slug = entry.project.name
+            let sessionId = entry.project.sessionId
             let t = Timer.scheduledTimer(withTimeInterval: max(delay, 0.5), repeats: false) { _ in
-                Task { @MainActor [weak self] in self?.runResume(projectName: name) }
+                Task { @MainActor [weak self] in self?.runResume(slug: slug, sessionId: sessionId) }
             }
             resumeTimers.append(t)
         }
@@ -137,7 +147,7 @@ public final class SeveranceStore: ObservableObject {
     // MARK: actions
 
     public func severNow(_ project: ProjectState) {
-        mergeState(project.name, [
+        mergeState(slug: project.name, sessionId: project.sessionId, [
             "paused": true, "status": "paused", "reason": "manual",
             "ts": Int(Date().timeIntervalSince1970),
         ])
@@ -148,9 +158,9 @@ public final class SeveranceStore: ObservableObject {
         // A severed project with a live pane gets the tmux continuation via resume.sh;
         // a manual/preempted pause (usually no pane) just has its flag cleared.
         if let pane = project.tmuxPane, !pane.isEmpty {
-            runResume(projectName: project.name)
+            runResume(slug: project.name, sessionId: project.sessionId)
         } else {
-            mergeState(project.name, [
+            mergeState(slug: project.name, sessionId: project.sessionId, [
                 "status": "active", "paused": false, "reason": NSNull(),
                 "preempted_by": NSNull(), "resume_at": NSNull(),
                 "ts": Int(Date().timeIntervalSince1970),
@@ -159,13 +169,13 @@ public final class SeveranceStore: ObservableObject {
         }
     }
 
-    private func runResume(projectName: String) {
-        let sf = stateDir.appendingPathComponent("projects/\(projectName).json")
+    private func runResume(slug: String, sessionId: String?) {
+        let sf = projectStateURL(slug: slug, sessionId: sessionId)
         if let resume = scriptPath("resume.sh") {
             runDetached(resume, [sf.path])
         } else {
             // No plugin scripts found: best-effort clear without a tmux prompt.
-            mergeState(projectName, [
+            mergeState(slug: slug, sessionId: sessionId, [
                 "status": "active", "paused": false, "resume_at": NSNull(),
                 "ts": Int(Date().timeIntervalSince1970),
             ])
@@ -223,8 +233,22 @@ public final class SeveranceStore: ObservableObject {
         try? p.run()
     }
 
-    private func mergeState(_ name: String, _ patch: [String: Any]) {
-        let sf = stateDir.appendingPathComponent("projects/\(name).json")
+    // The per-session lifecycle path projects/<slug>/<session_id>.json (issue #15).
+    // The session_id keys the file and is sanitized to the plugin's A-Za-z0-9._-
+    // class (mirrors sev_session_cost_file); the slug is already a sanitized dir
+    // name. Fall back to the slug as the file stem when sessionId is absent.
+    private func projectStateURL(slug: String, sessionId: String?) -> URL {
+        let stem = Self.sanitizeSessionId(sessionId ?? slug)
+        return stateDir.appendingPathComponent("projects/\(slug)/\(stem).json")
+    }
+
+    private static func sanitizeSessionId(_ id: String) -> String {
+        let allowed = Set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789._-")
+        return String(id.map { allowed.contains($0) ? $0 : "-" })
+    }
+
+    private func mergeState(slug: String, sessionId: String?, _ patch: [String: Any]) {
+        let sf = projectStateURL(slug: slug, sessionId: sessionId)
         var obj = (try? Data(contentsOf: sf))
             .flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
         for (k, v) in patch { obj[k] = v }

@@ -1,5 +1,5 @@
 {
-  "description": "Severance budget gate: PreToolUse + SessionStart gate, Stop heartbeat. Scripts are referenced via ${CLAUDE_PLUGIN_ROOT} and no-op unless the project sets SEVERANCE_ENABLED=1.",
+  "description": "Severance budget gate: PreToolUse + SessionStart gate, Stop heartbeat, SessionEnd cleanup. Scripts are referenced via ${CLAUDE_PLUGIN_ROOT} and no-op unless the project sets SEVERANCE_ENABLED=1.",
   "hooks": {
     "PreToolUse": [
       {
@@ -31,6 +31,17 @@
           {
             "type": "command",
             "command": "${CLAUDE_PLUGIN_ROOT}/scripts/heartbeat.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/scripts/session-end.sh",
             "timeout": 5
           }
         ]
