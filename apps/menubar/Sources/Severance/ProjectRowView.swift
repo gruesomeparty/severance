@@ -28,8 +28,11 @@ struct ProjectRowView: View {
             Circle().fill(ledColor).frame(width: 7, height: 7).padding(.top, 5)
 
             VStack(alignment: .leading, spacing: 3) {
-                HStack {
+                HStack(spacing: 6) {
                     Text(project.name).font(.system(size: 13, weight: .semibold))
+                    if !sessionLabel.isEmpty {
+                        Text(sessionLabel).font(.mono(9.5)).foregroundStyle(palette.inkMute)
+                    }
                     Spacer()
                     HStack(spacing: 5) {
                         Chip(text: project.priority.chipLabel, color: priorityColor,
@@ -127,6 +130,15 @@ struct ProjectRowView: View {
         case .high: return palette.inkSoft
         case .normal, .low: return palette.inkMute
         }
+    }
+
+    // Two sessions of one repo render as two rows sharing a slug; a short session
+    // marker keeps them distinguishable (issue #15). Prefer the tmux pane (e.g.
+    // %12) once set, else a truncated session id.
+    private var sessionLabel: String {
+        if let pane = project.tmuxPane, !pane.isEmpty { return pane }
+        if let sid = project.sessionId, !sid.isEmpty { return String(sid.prefix(8)) }
+        return ""
     }
 
     private var statusLabel: String {

@@ -114,7 +114,11 @@ public struct ProjectState: Codable, Identifiable {
     public var blockedCount: Int?
     public var paused: Bool
 
-    public var id: String { name }
+    // Multiple sessions of one repo share `name`; SwiftUI keys rows on `id`, so
+    // it must be session-unique. Composite slug + sessionId (fall back to name
+    // when sessionId is absent — the legacy single-file shape) keeps two live
+    // sessions of one slug distinct (issue #15).
+    public var id: String { "\(name)/\(sessionId ?? name)" }
     public var resumeAtDate: Date? { resumeAt.flatMap(SeveranceDate.parse) }
 }
 
