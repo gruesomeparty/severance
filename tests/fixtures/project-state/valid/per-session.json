@@ -1,0 +1,16 @@
+{
+  "name": "gaia-platform",
+  "cwd": "/home/berkay/dev/gaia-platform",
+  "status": "active",
+  "reason": null,
+  "priority": "normal",
+  "preempted_by": null,
+  "session_cost_usd": 0.87,
+  "limit_usd": 5.0,
+  "signal_tier": "statusline",
+  "session_id": "9359d2c5-1a2b-4c3d-8e9f-000000000001",
+  "blocked_count": 0,
+  "resume_count": 0,
+  "paused": false,
+  "ts": 1751450600
+}

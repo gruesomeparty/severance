@@ -28,7 +28,7 @@ fi
 echo
 echo "Refiners:"
 found=0
-for f in "$state_dir"/projects/*.json; do
+for f in "$state_dir"/projects/*/*.json; do
 	[ -e "$f" ] || continue
 	found=1
 	jq -r '

@@ -31,37 +31,39 @@ _usage_util() {
 		>"$SEVERANCE_STATE_DIR/usage.json"
 }
 
-_severed() { # <slug> <priority> <pane>
-	jq -n --arg n "$1" --arg p "$2" --arg pane "$3" \
-		'{name:$n, cwd:("/x/"+$n), status:"severed", reason:"session_util", priority:$p, paused:false, tmux_pane:$pane, resume_at:"2020-01-01T00:00:00Z", resume_count:0}' \
-		>"$PROJ/$1.json"
+_severed() { # <slug> <priority> <pane> [session_id]
+	local sid="${4:-s}"
+	mkdir -p "$PROJ/$1"
+	jq -n --arg n "$1" --arg p "$2" --arg pane "$3" --arg sid "$sid" \
+		'{name:$n, cwd:("/x/"+$n), status:"severed", reason:"session_util", priority:$p, paused:false, tmux_pane:$pane, session_id:$sid, resume_at:"2020-01-01T00:00:00Z", resume_count:0}' \
+		>"$PROJ/$1/$sid.json"
 }
 
 @test "AC3: severed project past resume_at with a live pane gets the continuation prompt" {
 	_usage_util 10
 	_severed p normal "$PANE"
-	run "$RESUME" "$PROJ/p.json"
+	run "$RESUME" "$PROJ/p/s.json"
 	[ "$status" -eq 0 ]
 	sleep 0.4
 	run tmux -S "$SOCK" capture-pane -p -t "$PANE"
 	[[ "$output" == *"Window has reset"* ]]
-	jq -e '.status=="active" and .resume_count==1 and .resume_at==null' "$PROJ/p.json"
+	jq -e '.status=="active" and .resume_count==1 and .resume_at==null' "$PROJ/p/s.json"
 }
 
 @test "resume: a vanished pane marks the project orphaned and does not respawn" {
 	_usage_util 10
 	_severed p normal "%999"
-	run "$RESUME" "$PROJ/p.json"
+	run "$RESUME" "$PROJ/p/s.json"
 	[ "$status" -eq 0 ]
-	jq -e '.status=="orphaned"' "$PROJ/p.json"
+	jq -e '.status=="orphaned"' "$PROJ/p/s.json"
 }
 
 @test "resume: still over threshold reschedules and does not resume" {
 	_usage_util 90
 	_severed p normal "$PANE"
-	run "$RESUME" "$PROJ/p.json"
+	run "$RESUME" "$PROJ/p/s.json"
 	[ "$status" -eq 0 ]
-	jq -e '.status=="severed"' "$PROJ/p.json"
+	jq -e '.status=="severed"' "$PROJ/p/s.json"
 	run tmux -S "$SOCK" capture-pane -p -t "$PANE"
 	[[ "$output" != *"Window has reset"* ]]
 }
@@ -75,8 +77,8 @@ _severed() { # <slug> <priority> <pane>
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"resumed hi"* ]]
 	[[ "$output" == *"held lo"* ]]
-	jq -e '.status=="active"' "$PROJ/hi.json"
-	jq -e '.status=="severed"' "$PROJ/lo.json"
+	jq -e '.status=="active"' "$PROJ/hi/s.json"
+	jq -e '.status=="severed"' "$PROJ/lo/s.json"
 }
 
 @test "AC12: --all with a cool window resumes high first, then low after the stagger" {
@@ -89,8 +91,8 @@ _severed() { # <slug> <priority> <pane>
 	hi_line="$(printf '%s\n' "$output" | grep -n 'resumed hi' | head -1 | cut -d: -f1)"
 	lo_line="$(printf '%s\n' "$output" | grep -n 'resumed lo' | head -1 | cut -d: -f1)"
 	[ -n "$hi_line" ] && [ -n "$lo_line" ] && [ "$hi_line" -lt "$lo_line" ]
-	jq -e '.status=="active"' "$PROJ/hi.json"
-	jq -e '.status=="active"' "$PROJ/lo.json"
+	jq -e '.status=="active"' "$PROJ/hi/s.json"
+	jq -e '.status=="active"' "$PROJ/lo/s.json"
 }
 
 @test "schedule-resume: invokes the scheduler with resume_at, unit, and state file" {
@@ -101,12 +103,33 @@ printf '%s\n' "$@" >"$SCHED_OUT"
 SH
 	chmod +x "$SEV_TMP/sched"
 	export SEVERANCE_SCHEDULER="$SEV_TMP/sched"
-	jq -n '{name:"p", cwd:"/x", status:"severed", priority:"normal", paused:false, resume_at:"2026-07-02T18:00:00Z"}' >"$PROJ/p.json"
-	run "$SCHEDULE" "$PROJ/p.json"
+	mkdir -p "$PROJ/p"
+	jq -n '{name:"p", cwd:"/x", status:"severed", priority:"normal", paused:false, session_id:"sessA", resume_at:"2026-07-02T18:00:00Z"}' >"$PROJ/p/sessA.json"
+	run "$SCHEDULE" "$PROJ/p/sessA.json"
 	[ "$status" -eq 0 ]
 	grep -q "2026-07-02T18:00:00Z" "$SCHED_OUT"
-	grep -q "severance-resume-p" "$SCHED_OUT"
-	grep -q "p.json" "$SCHED_OUT"
+	# Unit name incorporates the session id (#15) so concurrent sessions don't collide.
+	grep -q "severance-resume-p-sessA" "$SCHED_OUT"
+	grep -q "sessA.json" "$SCHED_OUT"
+}
+
+@test "#15: two sessions of one slug schedule distinct systemd units" {
+	export SCHED_OUT="$SEV_TMP/sched.out"
+	cat >"$SEV_TMP/sched" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$2" >>"$SCHED_OUT"
+SH
+	chmod +x "$SEV_TMP/sched"
+	export SEVERANCE_SCHEDULER="$SEV_TMP/sched"
+	mkdir -p "$PROJ/p"
+	jq -n '{name:"p", cwd:"/x", status:"severed", priority:"normal", paused:false, session_id:"sessA", resume_at:"2026-07-02T18:00:00Z"}' >"$PROJ/p/sessA.json"
+	jq -n '{name:"p", cwd:"/x", status:"severed", priority:"normal", paused:false, session_id:"sessB", resume_at:"2026-07-02T18:00:00Z"}' >"$PROJ/p/sessB.json"
+	run "$SCHEDULE" "$PROJ/p/sessA.json"
+	[ "$status" -eq 0 ]
+	run "$SCHEDULE" "$PROJ/p/sessB.json"
+	[ "$status" -eq 0 ]
+	grep -qx "severance-resume-p-sessA" "$SCHED_OUT"
+	grep -qx "severance-resume-p-sessB" "$SCHED_OUT"
 }
 
 @test "schedule-resume: no resume_at is a no-op (scheduler not invoked)" {

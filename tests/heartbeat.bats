@@ -11,7 +11,8 @@ setup() {
 	mkdir -p "$CWD"
 	export SEVERANCE_ENABLED=1
 	export SEVERANCE_PRIORITY=normal
-	SF="$SEVERANCE_STATE_DIR/projects/proj.json"
+	# Per-session state (#15): session_id "s1" from _stop, slug "proj" from cwd.
+	SF="$SEVERANCE_STATE_DIR/projects/proj/s1.json"
 }
 
 teardown() {
@@ -60,6 +61,7 @@ _stop() {
 }
 
 @test "heartbeat: preserves a severed status while updating cost" {
+	mkdir -p "$(dirname "$SF")"
 	jq -n --arg cwd "$CWD" \
 		'{name:"proj", cwd:$cwd, status:"severed", reason:"session_util", priority:"normal", paused:false, resume_count:1}' \
 		>"$SF"

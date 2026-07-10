@@ -9,5 +9,6 @@
   "severed_at": "2026-07-02T14:30:00Z",
   "resume_at": "2026-07-02T18:00:00Z",
   "resume_count": 0,
-  "paused": false
+  "paused": false,
+  "session_id": "sess-extra-01"
 }

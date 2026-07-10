@@ -18,7 +18,7 @@ cwd="$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null || true)"
 [ -n "$cwd" ] || cwd="$PWD"
 session_id="$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null || true)"
 slug="$(sev_slug "$cwd")"
-sf="$(sev_project_state_file "$slug")"
+sf="$(sev_project_state_file "$slug" "$session_id")"
 prio="$(sev_config_get SEVERANCE_PRIORITY normal)"
 
 usage_file="$(sev_state_dir)/usage.json"

@@ -9,5 +9,6 @@
   "limit_usd": 2.0,
   "signal_tier": "statusline",
   "paused": true,
-  "ts": 1751450600
+  "ts": 1751450600,
+  "session_id": "sess-preempt-01"
 }

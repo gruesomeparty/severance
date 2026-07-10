@@ -16,7 +16,13 @@ sf="${1:-}"
 resume_at="$(jq -r '.resume_at // empty' "$sf" 2>/dev/null || true)"
 slug="$(jq -r '.name // empty' "$sf" 2>/dev/null || true)"
 [ -n "$resume_at" ] && [ -n "$slug" ] || exit 0
+# Per-session unit name (#15): incorporate the session id so concurrent same-repo
+# sessions do not overwrite each other's timer. Sanitize the id like the path helper.
+session_id="$(jq -r '.session_id // empty' "$sf" 2>/dev/null || true)"
 unit="severance-resume-$slug"
+if [ -n "$session_id" ]; then
+	unit="severance-resume-$slug-$(printf '%s' "$session_id" | tr -c 'A-Za-z0-9._-' '-')"
+fi
 
 scheduler="${SEVERANCE_SCHEDULER:-}"
 if [ -z "$scheduler" ]; then

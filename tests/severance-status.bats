@@ -27,8 +27,9 @@ teardown() {
                  extra_usage:{is_enabled:null,used_credits:null}},
      cost:{total_cost_usd:1.42}, session_id:"s", model:"m", cwd:"x"}' \
 		>"$SEVERANCE_STATE_DIR/usage.json"
-	jq -n '{name:"one-ocean-cms", cwd:"/x", status:"severed", reason:"session_util", priority:"normal", paused:false, resume_at:"2026-07-02T18:00:00Z", resume_count:1}' \
-		>"$SEVERANCE_STATE_DIR/projects/one-ocean-cms.json"
+	mkdir -p "$SEVERANCE_STATE_DIR/projects/one-ocean-cms"
+	jq -n '{name:"one-ocean-cms", cwd:"/x", status:"severed", reason:"session_util", priority:"normal", paused:false, session_id:"sess-1", resume_at:"2026-07-02T18:00:00Z", resume_count:1}' \
+		>"$SEVERANCE_STATE_DIR/projects/one-ocean-cms/sess-1.json"
 	run "$STATUS"
 	[ "$status" -eq 0 ]
 	[[ "$output" == *"signal: statusline"* ]]

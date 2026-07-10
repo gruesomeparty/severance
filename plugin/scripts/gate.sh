@@ -28,7 +28,10 @@ cwd="$(_j '.cwd // empty')"
 session_id="$(_j '.session_id // empty')"
 file_path="$(_j '.tool_input.file_path // empty')"
 slug="$(sev_slug "$cwd")"
-sf="$(sev_project_state_file "$slug")"
+sf="$(sev_project_state_file "$slug" "$session_id")"
+# No migration (#15): the lifecycle record is now per-session. Opportunistically
+# drop any legacy flat projects/<slug>.json; it is never read or migrated.
+rm -f "$(sev_state_dir)/projects/$slug.json" 2>/dev/null || true
 
 # ---- resolve config / effective thresholds ----------------------------------
 prio="$(sev_config_get SEVERANCE_PRIORITY normal)"
@@ -109,7 +112,7 @@ fi
 
 # ---- not tripped: defend headroom, refresh active state, allow --------------
 if [ "$trip" -eq 0 ]; then
-	sev_preempt_sweep "$slug" "$prio" "$sess_util" || true
+	sev_preempt_sweep "$slug" "$session_id" "$prio" "$sess_util" || true
 	# shellcheck disable=SC2016  # $-names in the filter are jq variables (--arg), not shell
 	sev_state_merge "$sf" '
     . + {
