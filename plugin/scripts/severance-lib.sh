@@ -85,39 +85,84 @@ sev_normalize() {
 # ---- atomic I/O & locking ---------------------------------------------------
 
 # sev_atomic_write <dest> — write stdin to <dest> atomically (mktemp in the same
-# directory + mv, so readers never see a partial file).
+# directory + mv, so readers never see a partial file). Trap-cleans the temp file
+# so death before the mv (e.g. the writer killed mid-write, #25) leaves no `.sev.*`
+# behind; the trap is cleared once the mv lands, since mv is the atomic commit
+# point and the temp no longer needs cleanup after that.
 sev_atomic_write() {
 	local dest="$1" dir tmp
 	dir="$(dirname -- "$dest")"
 	mkdir -p "$dir"
 	tmp="$(mktemp "$dir/.sev.XXXXXX")"
+	trap 'rm -f "$tmp"' EXIT INT TERM
 	cat >"$tmp"
 	mv -f "$tmp" "$dest"
+	trap - EXIT INT TERM
+}
+
+# _sev_file_age_secs <path> — seconds since <path>'s mtime (BSD `stat -f` vs GNU
+# `stat -c`). Used by sev_locked's mkdir-fallback to detect a stale lock dir.
+_sev_file_age_secs() {
+	local f="$1" mtime now
+	now="$(sev_now 2>/dev/null || date +%s)"
+	mtime="$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null)" || return 1
+	printf '%s\n' "$((now - mtime))"
 }
 
 # sev_locked <lockfile> <cmd...> — run <cmd...> holding an exclusive lock.
-# Uses flock when available; otherwise a portable mkdir mutex (macOS has no flock).
-# Returns the command's exit status (75/EX_TEMPFAIL if the lock can't be acquired).
+# Uses flock when available; otherwise a portable mkdir mutex (macOS has no
+# flock; set SEV_LOCK_NO_FLOCK=1 to force the mkdir fallback on any host, for
+# testing). Returns the command's exit status (75/EX_TEMPFAIL if the lock can't
+# be acquired).
+#
+# The mkdir fallback recovers a stale lock dir (#25: a dead holder — e.g. killed
+# mid-write — used to leak it forever, wedging every future sev_locked caller):
+# on each failed mkdir, a lock dir at least SEV_LOCK_STALE_SECS old (default 10,
+# comfortably under the ~20s live-contention spin cap below) is stolen via an
+# atomic mv-then-rm so two racers can't both reclaim it, then mkdir is retried
+# immediately. A live holder's lock dir is younger than the threshold, so live
+# contention still serializes and spins up to the ~20s cap as before.
+#
+# Release is trap-based so a signal during the critical section still removes
+# the lock dir. The trap is scoped to this call: set right before running
+# "$@", explicitly cleared (`trap - EXIT INT TERM`) right after, alongside the
+# unconditional rmdir. It deliberately does NOT try to save/restore whatever
+# EXIT/INT/TERM trap the caller had before calling us: every real caller here
+# invokes sev_locked as the tail of a pipeline (`... | sev_locked ...`), which
+# bash runs in a subshell — re-arming a trap captured via `trap -p` right
+# before that subshell's own natural exit makes bash treat it as newly and
+# locally registered, so it fires immediately (verified: this deleted
+# statusline-bridge.sh's `$tmp_in` out from under it, mid-script). The
+# caller's own trap lives in the parent process, untouched by a subshell's
+# trap table, so leaving it alone here is both simpler and correct.
 sev_locked() {
 	local lockfile="$1"
 	shift
-	if command -v flock >/dev/null 2>&1; then
+	if [ -z "${SEV_LOCK_NO_FLOCK:-}" ] && command -v flock >/dev/null 2>&1; then
 		(
 			flock -x 9 || exit 75
 			"$@"
 		) 9>"$lockfile"
 		return $?
 	fi
-	local lockdir="$lockfile.d" waited=0 rc=0
+	local lockdir="$lockfile.d" waited=0 rc=0 stale age
+	stale="${SEV_LOCK_STALE_SECS:-10}"
 	while ! mkdir "$lockdir" 2>/dev/null; do
+		if age="$(_sev_file_age_secs "$lockdir" 2>/dev/null)" && [ "$age" -ge "$stale" ]; then
+			mv "$lockdir" "$lockdir.stale.$$" 2>/dev/null && rm -rf "$lockdir.stale.$$"
+			continue
+		fi
 		sleep 0.05
 		waited=$((waited + 1))
 		if [ "$waited" -ge 400 ]; then # ~20s
 			return 75
 		fi
 	done
+
+	trap 'rmdir "$lockdir" 2>/dev/null || true' EXIT INT TERM
 	"$@" || rc=$?
 	rmdir "$lockdir" 2>/dev/null || true
+	trap - EXIT INT TERM
 	return "$rc"
 }
 

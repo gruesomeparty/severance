@@ -103,9 +103,38 @@ creation, ~20s timeout) otherwise (macOS). Independently, `sev_atomic_write`
 always uses `mktemp` + `mv`, and rename is atomic on POSIX — so whole-file
 replaces (e.g. `usage.json`) never interleave even without a lock; the lock only
 serializes read-modify-write of shared files. Net behavior matches the PRD's
-intent on both platforms.
+intent on both platforms. `flock` is auto-used whenever present — it is not a
+required install; there is no fallback-vs-flock behavior gap left to document
+in the README.
 
 **Evidence:** `command -v flock` → missing on macOS 15.
+
+**Update (#25, crash-safety):** the mkdir mutex had no stale-lock recovery: a
+holder that died between `mkdir "$lockdir"` and `rmdir "$lockdir"` (observed
+trigger — Claude Code killing the `statusline-bridge.sh` subprocess mid-write
+on its statusline timeout) leaked the lock dir forever, freezing the shared
+state file for every future caller. `sev_locked`'s mkdir-fallback now reclaims
+a lock dir at least `SEV_LOCK_STALE_SECS` old (default 10s, under the ~20s
+live-contention spin cap) via an atomic `mv`-then-`rm` so two racers can't both
+reclaim it, and releases via a trap (`EXIT INT TERM`) scoped to the critical
+section so a signal during `"$@"` still removes the lock dir; `sev_atomic_write`
+likewise trap-cleans its `mktemp` temp so a death before the commit `mv` leaves
+no `.sev.*` behind. The flock branch (Linux) is unchanged. Neither trap tries
+to save/restore a trap the *caller* had already set: every real call site here
+runs `sev_locked`/`sev_atomic_write` at the tail of a pipeline (e.g.
+`printf ... | sev_locked ...` in `statusline-bridge.sh`), which bash executes
+in a subshell — re-arming a trap captured via `trap -p` right before that
+subshell's own natural exit makes bash treat it as freshly, locally registered,
+so it fires immediately. This was caught empirically: an early version that
+restored the caller's trap deleted `statusline-bridge.sh`'s own `$tmp_in` out
+from under it, mid-script. The caller's real trap lives in the (un-subshelled)
+parent process and is never touched, so leaving it alone is both simpler and
+correct; stale-lock reclaim remains the backstop for any lock dir a signal
+doesn't catch (e.g. `SIGKILL`, which no trap can intercept).
+
+**Evidence:** `tests/locking.bats`; reproduced the premature-delete failure
+against `tests/statusline-bridge.bats` and `tests/signal-tiers.bats` while
+iterating, before removing the trap-restore step.
 
 ---
 
