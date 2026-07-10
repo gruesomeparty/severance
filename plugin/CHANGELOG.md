@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.0](https://github.com/gruesomeparty/severance/compare/plugin-v1.0.1...plugin-v1.1.0) (2026-07-10)
+
+
+### Features
+
+* partition project state per session ([#15](https://github.com/gruesomeparty/severance/issues/15)) ([#29](https://github.com/gruesomeparty/severance/issues/29)) ([8806651](https://github.com/gruesomeparty/severance/commit/8806651aeac7cd32d48d5ae448a80c34cf5fb68c))
+
+
+### Bug Fixes
+
+* **plugin:** recover stale sev_locked mkdir mutex; liveness-primary reclaim ([#25](https://github.com/gruesomeparty/severance/issues/25)) ([#32](https://github.com/gruesomeparty/severance/issues/32)) ([1d0ff2c](https://github.com/gruesomeparty/severance/commit/1d0ff2cd11ab4ccbd3da76f185f01ce93ccd2afe))
+
 ## [1.0.1](https://github.com/gruesomeparty/severance/compare/plugin-v1.0.0...plugin-v1.0.1) (2026-07-03)
 
 
